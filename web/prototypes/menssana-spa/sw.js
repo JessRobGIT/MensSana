@@ -1,7 +1,7 @@
 // MensSana — Service Worker
 // Caches app shell for offline use. Chat requires network.
 
-const CACHE = 'menssana-v1'
+const CACHE = 'menssana-v2'
 const ASSETS = [
   '/MensSana/',
   '/MensSana/index.html',
@@ -30,6 +30,7 @@ self.addEventListener('fetch', e => {
   // Only cache same-origin requests — let Supabase/API calls pass through
   if (url.origin !== location.origin) return
   e.respondWith(
-    caches.match(e.request).then(cached => cached ?? fetch(e.request))
+    caches.match(e.request, { ignoreSearch: true })
+      .then(cached => cached ?? fetch(e.request))
   )
 })

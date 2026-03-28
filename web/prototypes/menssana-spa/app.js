@@ -29,18 +29,27 @@ const headerUser   = document.getElementById('header-user')
 
 // ── Auth state ───────────────────────────────────────────
 
+function isNetworkError (err) {
+  return err?.message?.toLowerCase().includes('fetch') ||
+         err?.message?.toLowerCase().includes('network')
+}
+
+function showOffline () {
+  showBanner('Kein Internet — Gespräche können gerade nicht gesendet werden.', true)
+  sendBtn.disabled = true
+}
+
+function showOnline () {
+  showBanner('')
+  sendBtn.disabled = false
+}
+
 async function initApp (user) {
   if (appInitialized) return
   appInitialized = true
   currentUser = user
   headerUser.textContent = user.email
   showApp()
-
-  if (!navigator.onLine) {
-    updateOnlineStatus()
-    return
-  }
-
   await loadOrCreateConversation()
   await loadMessages()
 }
@@ -153,7 +162,8 @@ async function loadOrCreateConversation () {
     .maybeSingle()
 
   if (error) {
-    showBanner('Verbindungsfehler: ' + error.message, true)
+    if (isNetworkError(error)) showOffline()
+    else showBanner('Verbindungsfehler: ' + error.message, true)
     return
   }
 
@@ -300,9 +310,14 @@ async function sendMessage () {
       .update({ updated_at: new Date().toISOString() })
       .eq('id', currentConversation.id)
 
-  } catch (_err) {
+  } catch (err) {
     if (typingEl) typingEl.remove()
-    appendMessage('assistant', 'Entschuldigung, es ist ein Fehler aufgetreten.')
+    if (isNetworkError(err)) {
+      showOffline()
+      appendMessage('assistant', 'Kein Internet — bitte versuchen Sie es erneut wenn Sie wieder online sind.')
+    } else {
+      appendMessage('assistant', 'Entschuldigung, es ist ein Fehler aufgetreten.')
+    }
   } finally {
     isSending        = false
     sendBtn.disabled = false
@@ -311,20 +326,13 @@ async function sendMessage () {
 }
 
 // ── Offline detection ─────────────────────────────────────
-function updateOnlineStatus () {
-  if (!navigator.onLine) {
-    showBanner('Kein Internet — Gespräche können gerade nicht gesendet werden.', true)
-    sendBtn.disabled = true
-  } else {
-    showBanner('')
-    sendBtn.disabled = false
-    if (currentUser && !currentConversation) {
-      loadOrCreateConversation().then(() => loadMessages())
-    }
+window.addEventListener('offline', showOffline)
+window.addEventListener('online', () => {
+  showOnline()
+  if (currentUser && !currentConversation) {
+    loadOrCreateConversation().then(() => loadMessages())
   }
-}
-window.addEventListener('offline', updateOnlineStatus)
-window.addEventListener('online',  updateOnlineStatus)
+})
 
 sendBtn.addEventListener('click', sendMessage)
 
