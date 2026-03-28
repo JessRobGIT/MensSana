@@ -334,9 +334,6 @@ async function sendMessage () {
     const rawBody = await fnRes.text()
     if (fnRes.ok) {
       try { fnJson = JSON.parse(rawBody) } catch (_) {}
-      if (!fnJson?.content?.trim()) {
-        showBanner(`DEBUG HTTP ${fnRes.status}: ${rawBody.slice(0, 200)}`, true)
-      }
     } else {
       showBanner(`Fehler ${fnRes.status}: ${rawBody}`, true)
     }
