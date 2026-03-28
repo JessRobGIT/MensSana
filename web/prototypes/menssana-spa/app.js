@@ -37,6 +37,19 @@ const chatSection    = document.getElementById('chat-section')
 const medsBack       = document.getElementById('meds-back')
 const medsAddBtn     = document.getElementById('meds-add-btn')
 const medsList       = document.getElementById('meds-list')
+const calBtn         = document.getElementById('cal-btn')
+const calSection     = document.getElementById('calendar-section')
+const calBack        = document.getElementById('calendar-back')
+const calAddBtn      = document.getElementById('calendar-add-btn')
+const calList        = document.getElementById('cal-list')
+const calFormOverlay = document.getElementById('cal-form-overlay')
+const calFormTitle   = document.getElementById('cal-form-title')
+const calFormSave    = document.getElementById('cal-form-save')
+const calFormCancel  = document.getElementById('cal-form-cancel')
+const calTitleInput  = document.getElementById('cal-title')
+const calDateInput   = document.getElementById('cal-date')
+const calTimeInput   = document.getElementById('cal-time')
+const calNotesInput  = document.getElementById('cal-notes')
 const medFormOverlay = document.getElementById('med-form-overlay')
 const medFormTitle   = document.getElementById('med-form-title')
 const medFormSave    = document.getElementById('med-form-save')
@@ -398,23 +411,30 @@ function appendMessage (role, content) {
 
 // ── Medications ───────────────────────────────────────────
 
-function showMedsView () {
-  chatSection.classList.add('hidden')
-  medsSection.classList.remove('hidden')
-  loadMedicationsFromDB().then(meds => {
-    _medications = meds
-    renderMedications()
-  })
+function showSection (name) {
+  chatSection.classList.toggle('hidden', name !== 'chat')
+  medsSection.classList.toggle('hidden', name !== 'meds')
+  calSection.classList.toggle('hidden', name !== 'calendar')
 }
 
-function showChatView () {
-  medsSection.classList.add('hidden')
-  chatSection.classList.remove('hidden')
+function showChatView () { showSection('chat') }
+
+function showMedsView () {
+  showSection('meds')
+  loadMedicationsFromDB().then(meds => { _medications = meds; renderMedications() })
+}
+
+function showCalendarView () {
+  showSection('calendar')
+  loadCalendarFromDB().then(entries => { _calendarEntries = entries; renderCalendar() })
 }
 
 medsBtn.addEventListener('click', showMedsView)
 medsBack.addEventListener('click', showChatView)
 medsAddBtn.addEventListener('click', () => showMedForm(null))
+calBtn.addEventListener('click', showCalendarView)
+calBack.addEventListener('click', showChatView)
+calAddBtn.addEventListener('click', () => showCalendarForm(null))
 
 async function loadMedicationsFromDB () {
   const { data, error } = await sb
@@ -574,6 +594,151 @@ async function deleteMedicationFromDB (id) {
 
 async function updateMedicationActiveInDB (id, active) {
   const { error } = await sb.from('medications').update({ active }).eq('id', id).eq('user_id', currentUser.id)
+  return !error
+}
+
+// ── Calendar ──────────────────────────────────────────────
+
+let _calendarEntries = []
+let _editingCalId    = null
+
+async function loadCalendarFromDB () {
+  const { data, error } = await sb
+    .from('calendar_events')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .order('starts_at', { ascending: true })
+
+  if (error) {
+    calList.innerHTML = '<p class="cal-empty" style="color:var(--danger)">Termine konnten nicht geladen werden.</p>'
+    return []
+  }
+
+  return (data ?? []).map(entry => {
+    const start   = new Date(entry.starts_at)
+    const isoDate = start.toISOString().slice(0, 10)
+    const hh      = String(start.getHours()).padStart(2, '0')
+    const mm      = String(start.getMinutes()).padStart(2, '0')
+    return {
+      id:         entry.id,
+      title:      entry.title,
+      date:       isoDate,
+      time:       `${hh}:${mm}`,
+      notes:      entry.description ?? '',
+      allDay:     entry.all_day ?? false,
+      startsAt:   entry.starts_at,
+      endsAt:     entry.ends_at,
+      reminderAt: entry.reminder_at,
+    }
+  })
+}
+
+function formatCalDate (dateStr, timeStr, allDay) {
+  const d = new Date(dateStr + 'T12:00:00')
+  const day = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  return allDay ? day : `${day}, ${timeStr} Uhr`
+}
+
+function renderCalendar () {
+  if (!_calendarEntries.length) {
+    calList.innerHTML = '<p class="cal-empty">Noch keine Termine eingetragen.<br>Tippen Sie auf „+ Hinzufügen".</p>'
+    return
+  }
+
+  calList.innerHTML = ''
+  _calendarEntries.forEach(entry => {
+    const card = document.createElement('div')
+    card.className = 'cal-entry-card'
+    card.innerHTML = `
+      <span class="cal-entry-date">${formatCalDate(entry.date, entry.time, entry.allDay)}</span>
+      <span class="cal-entry-title">${escapeHtml(entry.title)}</span>
+      ${entry.notes ? `<span class="cal-entry-notes">${escapeHtml(entry.notes)}</span>` : ''}
+      <div class="cal-entry-actions">
+        <button class="btn-edit">Bearbeiten</button>
+        <button class="btn-delete">Löschen</button>
+      </div>
+    `
+
+    card.querySelector('.btn-edit').addEventListener('click', () => showCalendarForm(entry))
+
+    card.querySelector('.btn-delete').addEventListener('click', () => {
+      showConfirm(
+        `„${entry.title}" wirklich löschen?`,
+        'Ja, löschen',
+        async () => {
+          const ok = await deleteCalendarEntryFromDB(entry.id)
+          if (!ok) { showBanner('Termin konnte nicht gelöscht werden.', true); return }
+          _calendarEntries = await loadCalendarFromDB()
+          renderCalendar()
+        }
+      )
+    })
+
+    calList.appendChild(card)
+  })
+}
+
+function showCalendarForm (entry) {
+  _editingCalId              = entry?.id ?? null
+  calFormTitle.textContent   = entry ? 'Termin bearbeiten' : 'Termin hinzufügen'
+  calTitleInput.value        = entry?.title ?? ''
+  calDateInput.value         = entry?.date  ?? new Date().toISOString().slice(0, 10)
+  calTimeInput.value         = entry?.time  ?? '09:00'
+  calNotesInput.value        = entry?.notes ?? ''
+  calFormOverlay.classList.remove('hidden')
+  calTitleInput.focus()
+}
+
+function hideCalendarForm () {
+  calFormOverlay.classList.add('hidden')
+  _editingCalId = null
+}
+
+calFormCancel.addEventListener('click', hideCalendarForm)
+
+calFormSave.addEventListener('click', async () => {
+  const title = calTitleInput.value.trim()
+  if (!title) { calTitleInput.focus(); return }
+
+  const ok = await saveCalendarEntryToDB({
+    id:    _editingCalId,
+    title,
+    date:  calDateInput.value,
+    time:  calTimeInput.value,
+    notes: calNotesInput.value.trim(),
+    allDay: false,
+  })
+
+  if (!ok) { showBanner('Termin konnte nicht gespeichert werden.', true); return }
+
+  hideCalendarForm()
+  _calendarEntries = await loadCalendarFromDB()
+  renderCalendar()
+})
+
+async function saveCalendarEntryToDB (entry) {
+  const startsAt = `${entry.date}T${entry.time}:00`
+  const payload  = {
+    user_id:     currentUser.id,
+    title:       entry.title,
+    description: entry.notes || null,
+    starts_at:   startsAt,
+    ends_at:     entry.endsAt ?? null,
+    all_day:     entry.allDay ?? false,
+    reminder_at: entry.reminderAt ?? null,
+  }
+
+  if (entry.id) {
+    const { error } = await sb.from('calendar_events').update(payload).eq('id', entry.id).eq('user_id', currentUser.id)
+    return !error
+  } else {
+    const { error } = await sb.from('calendar_events').insert([payload])
+    return !error
+  }
+}
+
+async function deleteCalendarEntryFromDB (id) {
+  const { error } = await sb.from('calendar_events').delete().eq('id', id).eq('user_id', currentUser.id)
   return !error
 }
 

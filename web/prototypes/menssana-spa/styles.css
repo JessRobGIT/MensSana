@@ -601,6 +601,107 @@ html, body {
   margin-top: 8px;
 }
 
+/* ── CALENDAR ───────────────────────────────────────────── */
+
+#calendar-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+#calendar-section.hidden { display: none; }
+
+.cal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.cal-toolbar h2 {
+  flex: 1;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.cal-toolbar .btn-icon {
+  background: var(--green-pale);
+  color: var(--green);
+}
+
+.cal-toolbar .btn-icon:hover {
+  background: var(--green);
+  color: #fff;
+}
+
+#cal-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cal-entry-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cal-entry-date {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.cal-entry-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.cal-entry-notes {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.cal-entry-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cal-entry-actions button {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.cal-entry-actions .btn-edit:hover   { background: var(--green-pale); color: var(--green); }
+.cal-entry-actions .btn-delete:hover { background: #fdecea; color: var(--danger); }
+
+.cal-empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1.7;
+  padding: 48px 24px;
+}
+
 /* ── RESPONSIVE ────────────────────────────────────────── */
 
 @media (max-width: 700px) {

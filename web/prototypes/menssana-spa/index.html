@@ -57,6 +57,7 @@
           + Neu
         </button>
         <button class="btn-icon" id="meds-btn">Medikamente</button>
+        <button class="btn-icon" id="cal-btn">Kalender</button>
         <button class="btn-icon" id="logout-btn">
           Abmelden
         </button>
@@ -96,6 +97,15 @@
             <button class="btn-icon" id="meds-add-btn">+ Hinzufügen</button>
           </div>
           <div id="meds-list"></div>
+        </div>
+
+        <div id="calendar-section" class="hidden">
+          <div class="cal-toolbar">
+            <button class="btn-icon" id="calendar-back">← Chat</button>
+            <h2>Meine Termine</h2>
+            <button class="btn-icon" id="calendar-add-btn">+ Hinzufügen</button>
+          </div>
+          <div id="cal-list"></div>
         </div>
       </div>
 
@@ -148,9 +158,36 @@
     </div>
   </div>
 
+  <!-- Kalender Formular -->
+  <div id="cal-form-overlay" class="hidden" role="dialog" aria-modal="true">
+    <div class="med-form-card">
+      <h3 id="cal-form-title">Termin hinzufügen</h3>
+      <div class="form-group">
+        <label for="cal-title">Titel *</label>
+        <input id="cal-title" type="text" placeholder="z.B. Arzttermin" />
+      </div>
+      <div class="form-group">
+        <label for="cal-date">Datum</label>
+        <input id="cal-date" type="date" />
+      </div>
+      <div class="form-group">
+        <label for="cal-time">Uhrzeit</label>
+        <input id="cal-time" type="time" value="09:00" />
+      </div>
+      <div class="form-group">
+        <label for="cal-notes">Notizen</label>
+        <textarea id="cal-notes" rows="2" placeholder="z.B. Überweisung mitbringen"></textarea>
+      </div>
+      <div class="med-form-actions">
+        <button class="btn btn-primary" id="cal-form-save">Speichern</button>
+        <button class="btn btn-secondary" id="cal-form-cancel">Abbrechen</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=27"></script>
+  <script src="app.js?v=28"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')
