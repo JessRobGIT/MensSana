@@ -48,14 +48,9 @@ async function initApp (user) {
   }
 }
 
-sb.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'INITIAL_SESSION') {
-    // Fires once on page load after session is fully ready (tokens refreshed)
-    if (session?.user) await initApp(session.user)
-    // else: login view is shown by default via CSS
-  } else if (event === 'SIGNED_IN' && !appInitialized) {
-    // Fresh login (not reload)
-    if (session?.user) await initApp(session.user)
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'INITIAL_SESSION' || (event === 'SIGNED_IN' && !appInitialized)) {
+    if (session?.user) setTimeout(() => initApp(session.user), 0)
   } else if (event === 'SIGNED_OUT') {
     appInitialized      = false
     currentUser         = null
