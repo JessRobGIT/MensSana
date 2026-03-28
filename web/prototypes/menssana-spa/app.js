@@ -65,6 +65,21 @@ sb.auth.onAuthStateChange((event, session) => {
   }
 })
 
+// ── Session helpers ───────────────────────────────────────
+function isAuthError (err) {
+  const msg = (err?.message ?? err?.code ?? '').toLowerCase()
+  return msg.includes('jwt') || msg.includes('session') ||
+         msg.includes('auth') || msg.includes('401')
+}
+
+function handleSessionExpired () {
+  appInitialized      = false
+  currentUser         = null
+  currentConversation = null
+  showLogin()
+  setLoginStatus('Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.', true)
+}
+
 // ── View helpers ─────────────────────────────────────────
 function showLogin () {
   loginView.style.display = 'flex'
@@ -163,6 +178,7 @@ async function loadOrCreateConversation () {
 
   if (error) {
     if (isNetworkError(error)) showOffline()
+    else if (isAuthError(error)) handleSessionExpired()
     else showBanner('Verbindungsfehler: ' + error.message, true)
     return
   }
@@ -315,6 +331,8 @@ async function sendMessage () {
     if (isNetworkError(err)) {
       showOffline()
       appendMessage('assistant', 'Kein Internet — bitte versuchen Sie es erneut wenn Sie wieder online sind.')
+    } else if (isAuthError(err)) {
+      handleSessionExpired()
     } else {
       appendMessage('assistant', 'Entschuldigung, es ist ein Fehler aufgetreten.')
     }
