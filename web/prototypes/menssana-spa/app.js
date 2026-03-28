@@ -252,6 +252,7 @@ async function sendMessage () {
 
   isSending            = true
   sendBtn.disabled     = true
+  sendBtn.textContent  = 'Wird gesendet…'
   messageInput.value   = ''
   autoResize()
 
@@ -337,8 +338,9 @@ async function sendMessage () {
       appendMessage('assistant', 'Entschuldigung, es ist ein Fehler aufgetreten.')
     }
   } finally {
-    isSending        = false
-    sendBtn.disabled = false
+    isSending           = false
+    sendBtn.disabled    = messageInput.value.trim() === ''
+    sendBtn.textContent = 'Senden'
     messageInput.focus()
   }
 }
@@ -366,4 +368,7 @@ function autoResize () {
   messageInput.style.height = 'auto'
   messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px'
 }
-messageInput.addEventListener('input', autoResize)
+messageInput.addEventListener('input', () => {
+  autoResize()
+  sendBtn.disabled = messageInput.value.trim() === '' || isSending
+})

@@ -66,13 +66,13 @@
         placeholder="Schreiben Sie hier …"
         aria-label="Nachricht eingeben"
       ></textarea>
-      <button id="send-btn" aria-label="Senden">Senden</button>
+      <button id="send-btn" aria-label="Senden" disabled>Senden</button>
     </div>
   </div>
 
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=18"></script>
+  <script src="app.js?v=19"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')
