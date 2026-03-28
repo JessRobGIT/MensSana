@@ -251,7 +251,13 @@ async function sendMessage () {
     typingEl.remove()
     typingEl = null
 
-    const fnJson = fnRes.ok ? await fnRes.json() : null
+    let fnJson = null
+    if (fnRes.ok) {
+      fnJson = await fnRes.json()
+    } else {
+      const errBody = await fnRes.text()
+      showBanner(`Fehler ${fnRes.status}: ${errBody}`, true)
+    }
     const reply = fnJson?.content
       ?? 'Entschuldigung, ich konnte gerade nicht antworten. Bitte versuchen Sie es noch einmal.'
 
