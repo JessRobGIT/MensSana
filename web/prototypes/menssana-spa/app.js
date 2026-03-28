@@ -376,8 +376,11 @@ function appendMessage (role, content) {
 
 // ── Send ──────────────────────────────────────────────────
 async function sendMessage () {
-  const text = messageInput.value.trim()
+  const text   = messageInput.value.trim()
   if (!text || isSending || !currentConversation) return
+
+  // Snapshot: pin the conversation this message belongs to
+  const convId = currentConversation.id
 
   isSending            = true
   sendBtn.disabled     = true
@@ -390,27 +393,29 @@ async function sendMessage () {
   try {
     appendMessage('user', text)
 
-    // Persist user message
+    // Persist user message to the pinned conversation
     await sb.from('messages').insert({
-      conversation_id: currentConversation.id,
+      conversation_id: convId,
       role:            'user',
       content:         text,
     })
 
-    // Fetch recent history for context (last 20 messages)
+    // Fetch history for the pinned conversation
     const { data: history } = await sb
       .from('messages')
       .select('role, content')
-      .eq('conversation_id', currentConversation.id)
+      .eq('conversation_id', convId)
       .order('created_at', { ascending: true })
       .limit(20)
 
-    // Typing indicator
-    typingEl             = document.createElement('div')
-    typingEl.className   = 'message assistant typing'
-    typingEl.textContent = 'Ich überlege kurz…'
-    messagesEl.appendChild(typingEl)
-    messagesEl.scrollTop = messagesEl.scrollHeight
+    // Typing indicator — only show if still in the same conversation
+    if (currentConversation?.id === convId) {
+      typingEl             = document.createElement('div')
+      typingEl.className   = 'message assistant typing'
+      typingEl.textContent = 'Ich überlege kurz…'
+      messagesEl.appendChild(typingEl)
+      messagesEl.scrollTop = messagesEl.scrollHeight
+    }
 
     const session = (await sb.auth.getSession()).data.session
     const fnRes = await fetch(
@@ -426,8 +431,7 @@ async function sendMessage () {
       }
     )
 
-    typingEl.remove()
-    typingEl = null
+    if (typingEl) { typingEl.remove(); typingEl = null }
 
     let fnJson = null
     const rawBody = await fnRes.text()
@@ -439,33 +443,38 @@ async function sendMessage () {
     const reply = fnJson?.content?.trim() ||
       'Entschuldigung, ich konnte gerade nicht antworten. Bitte versuchen Sie es noch einmal.'
 
-    appendMessage('assistant', reply)
+    // Only show reply in UI if user is still viewing this conversation
+    if (currentConversation?.id === convId) {
+      appendMessage('assistant', reply)
+    }
 
-    // Persist assistant message
+    // Always persist the reply to the correct (pinned) conversation
     if (fnJson?.content?.trim()) {
       await sb.from('messages').insert({
-        conversation_id: currentConversation.id,
+        conversation_id: convId,
         role:            'assistant',
         content:         reply,
       })
     }
 
-    // Update conversation timestamp + refresh history list
+    // Update timestamp for the pinned conversation
     await sb
       .from('conversations')
       .update({ updated_at: new Date().toISOString() })
-      .eq('id', currentConversation.id)
+      .eq('id', convId)
     await loadConversations()
 
   } catch (err) {
     if (typingEl) typingEl.remove()
     if (isNetworkError(err)) {
       showOffline()
-      appendMessage('assistant', 'Kein Internet — bitte versuchen Sie es erneut wenn Sie wieder online sind.')
+      if (currentConversation?.id === convId)
+        appendMessage('assistant', 'Kein Internet — bitte versuchen Sie es erneut wenn Sie wieder online sind.')
     } else if (isAuthError(err)) {
       handleSessionExpired()
     } else {
-      appendMessage('assistant', 'Entschuldigung, es ist ein Fehler aufgetreten.')
+      if (currentConversation?.id === convId)
+        appendMessage('assistant', 'Entschuldigung, es ist ein Fehler aufgetreten.')
     }
   } finally {
     isSending           = false
