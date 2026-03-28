@@ -30,19 +30,22 @@ const headerUser   = document.getElementById('header-user')
 
 // On page load / reload: restore session from localStorage
 ;(async () => {
+  console.log('[MS] init: getSession start')
   const { data: { session } } = await sb.auth.getSession()
+  console.log('[MS] init: session=', session?.user?.email ?? 'none')
   if (session?.user) {
     currentUser = session.user
     headerUser.textContent = currentUser.email
     showApp()
     await loadOrCreateConversation()
+    console.log('[MS] init: conv=', currentConversation?.id ?? 'null')
     await loadMessages()
   }
-  // else: login view is shown by default via CSS
 })()
 
 // Listen only for explicit sign-in and sign-out events
 sb.auth.onAuthStateChange(async (event, session) => {
+  console.log('[MS] auth event:', event, session?.user?.email ?? 'none')
   if (event === 'SIGNED_IN' && session?.user && !currentConversation) {
     currentUser = session.user
     headerUser.textContent = currentUser.email
