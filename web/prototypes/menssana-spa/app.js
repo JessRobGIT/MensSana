@@ -10,6 +10,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 let currentUser         = null
 let currentConversation = null
 let isSending           = false
+let appInitialized      = false
 
 // ── DOM refs ─────────────────────────────────────────────
 const loginView    = document.getElementById('login-view')
@@ -28,31 +29,28 @@ const headerUser   = document.getElementById('header-user')
 
 // ── Auth state ───────────────────────────────────────────
 
+async function initApp (user) {
+  if (appInitialized) return
+  appInitialized = true
+  currentUser = user
+  headerUser.textContent = user.email
+  showApp()
+  await loadOrCreateConversation()
+  await loadMessages()
+}
+
 // On page load / reload: restore session from localStorage
 ;(async () => {
-  console.log('[MS] init: getSession start')
   const { data: { session } } = await sb.auth.getSession()
-  console.log('[MS] init: session=', session?.user?.email ?? 'none')
-  if (session?.user) {
-    currentUser = session.user
-    headerUser.textContent = currentUser.email
-    showApp()
-    await loadOrCreateConversation()
-    console.log('[MS] init: conv=', currentConversation?.id ?? 'null')
-    await loadMessages()
-  }
+  if (session?.user) await initApp(session.user)
 })()
 
-// Listen only for explicit sign-in and sign-out events
+// Listen for sign-in and sign-out events
 sb.auth.onAuthStateChange(async (event, session) => {
-  console.log('[MS] auth event:', event, session?.user?.email ?? 'none')
-  if (event === 'SIGNED_IN' && session?.user && !currentConversation) {
-    currentUser = session.user
-    headerUser.textContent = currentUser.email
-    showApp()
-    await loadOrCreateConversation()
-    await loadMessages()
+  if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
+    await initApp(session.user)
   } else if (event === 'SIGNED_OUT') {
+    appInitialized      = false
     currentUser         = null
     currentConversation = null
     showLogin()
