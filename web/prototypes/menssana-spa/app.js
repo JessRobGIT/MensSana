@@ -331,11 +331,14 @@ async function sendMessage () {
     typingEl = null
 
     let fnJson = null
+    const rawBody = await fnRes.text()
     if (fnRes.ok) {
-      fnJson = await fnRes.json()
+      try { fnJson = JSON.parse(rawBody) } catch (_) {}
+      if (!fnJson?.content?.trim()) {
+        showBanner(`DEBUG HTTP ${fnRes.status}: ${rawBody.slice(0, 200)}`, true)
+      }
     } else {
-      const errBody = await fnRes.text()
-      showBanner(`Fehler ${fnRes.status}: ${errBody}`, true)
+      showBanner(`Fehler ${fnRes.status}: ${rawBody}`, true)
     }
     const reply = fnJson?.content?.trim() ||
       'Entschuldigung, ich konnte gerade nicht antworten. Bitte versuchen Sie es noch einmal.'
