@@ -105,15 +105,35 @@ function formatAuthError (error) {
 // ── Logout ───────────────────────────────────────────────
 logoutBtn.addEventListener('click', () => sb.auth.signOut())
 
+// ── Status banner ─────────────────────────────────────────
+function showBanner (msg, isError = false) {
+  let banner = document.getElementById('app-banner')
+  if (!banner) {
+    banner = document.createElement('div')
+    banner.id = 'app-banner'
+    banner.style.cssText = 'padding:10px 24px;font-size:.9rem;text-align:center'
+    messagesEl.before(banner)
+  }
+  banner.textContent  = msg
+  banner.style.background = isError ? '#fdecea' : '#eaf4ee'
+  banner.style.color      = isError ? '#c0392b'  : '#2d6a4f'
+  if (!msg) banner.remove()
+}
+
 // ── Conversations ─────────────────────────────────────────
 async function loadOrCreateConversation () {
-  const { data } = await sb
+  const { data, error } = await sb
     .from('conversations')
     .select('id, title')
     .eq('user_id', currentUser.id)
     .order('updated_at', { ascending: false })
     .limit(1)
     .maybeSingle()
+
+  if (error) {
+    showBanner('Verbindungsfehler: ' + error.message, true)
+    return
+  }
 
   if (data) {
     currentConversation = data
@@ -123,11 +143,16 @@ async function loadOrCreateConversation () {
 }
 
 async function createNewConversation () {
-  const { data } = await sb
+  const { data, error } = await sb
     .from('conversations')
     .insert({ user_id: currentUser.id, title: 'Gespräch' })
     .select()
     .single()
+
+  if (error) {
+    showBanner('Gespräch konnte nicht angelegt werden: ' + error.message, true)
+    return
+  }
   currentConversation = data
 }
 
@@ -209,21 +234,31 @@ async function sendMessage () {
     messagesEl.appendChild(typingEl)
     messagesEl.scrollTop = messagesEl.scrollHeight
 
-    const { data: fnData, error: fnError } = await sb.functions.invoke('chat', {
-      body: { messages: history ?? [] },
-    })
+    const session = (await sb.auth.getSession()).data.session
+    const fnRes = await fetch(
+      'https://sycfzysiwshdijeintyt.supabase.co/functions/v1/chat',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${session?.access_token ?? SUPABASE_ANON_KEY}`,
+          'apikey':        SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ messages: history ?? [] }),
+      }
+    )
 
     typingEl.remove()
     typingEl = null
 
-    const reply = fnError
-      ? 'Entschuldigung, ich konnte gerade nicht antworten. Bitte versuchen Sie es noch einmal.'
-      : (fnData?.content ?? 'Entschuldigung, es ist ein unbekannter Fehler aufgetreten.')
+    const fnJson = fnRes.ok ? await fnRes.json() : null
+    const reply = fnJson?.content
+      ?? 'Entschuldigung, ich konnte gerade nicht antworten. Bitte versuchen Sie es noch einmal.'
 
     appendMessage('assistant', reply)
 
     // Persist assistant message
-    if (!fnError) {
+    if (fnJson?.content) {
       await sb.from('messages').insert({
         conversation_id: currentConversation.id,
         role:            'assistant',
