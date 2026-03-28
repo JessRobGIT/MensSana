@@ -262,7 +262,7 @@ async function sendMessage () {
     // Typing indicator
     typingEl             = document.createElement('div')
     typingEl.className   = 'message assistant typing'
-    typingEl.textContent = '…'
+    typingEl.textContent = 'Ich überlege kurz…'
     messagesEl.appendChild(typingEl)
     messagesEl.scrollTop = messagesEl.scrollHeight
 
