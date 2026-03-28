@@ -1,0 +1,2 @@
+-- MensSana — Seed-Daten
+-- Stand: Platzhalter für Testdaten
