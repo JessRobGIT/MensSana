@@ -27,23 +27,31 @@ const newConvBtn   = document.getElementById('new-conv-btn')
 const headerUser   = document.getElementById('header-user')
 
 // ── Auth state ───────────────────────────────────────────
-sb.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'SIGNED_OUT') {
-    currentUser         = null
-    currentConversation = null
-    showLogin()
-    return
-  }
 
+// On page load / reload: restore session from localStorage
+;(async () => {
+  const { data: { session } } = await sb.auth.getSession()
   if (session?.user) {
     currentUser = session.user
     headerUser.textContent = currentUser.email
     showApp()
-    if (!currentConversation) {
-      await loadOrCreateConversation()
-      await loadMessages()
-    }
-  } else if (event === 'INITIAL_SESSION') {
+    await loadOrCreateConversation()
+    await loadMessages()
+  }
+  // else: login view is shown by default via CSS
+})()
+
+// Listen only for explicit sign-in and sign-out events
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'SIGNED_IN' && session?.user && !currentConversation) {
+    currentUser = session.user
+    headerUser.textContent = currentUser.email
+    showApp()
+    await loadOrCreateConversation()
+    await loadMessages()
+  } else if (event === 'SIGNED_OUT') {
+    currentUser         = null
+    currentConversation = null
     showLogin()
   }
 })
