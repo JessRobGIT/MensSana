@@ -11,6 +11,8 @@ let currentUser         = null
 let currentConversation = null
 let isSending           = false
 let appInitialized      = false
+let _medications        = []
+let _editingMedId       = null
 
 // ── DOM refs ─────────────────────────────────────────────
 const loginView       = document.getElementById('login-view')
@@ -29,6 +31,21 @@ const headerUser      = document.getElementById('header-user')
 const historyPanel    = document.getElementById('history-panel')
 const historyToggle   = document.getElementById('history-toggle-btn')
 const convList        = document.getElementById('conversation-list')
+const medsBtn        = document.getElementById('meds-btn')
+const medsSection    = document.getElementById('meds-section')
+const chatSection    = document.getElementById('chat-section')
+const medsBack       = document.getElementById('meds-back')
+const medsAddBtn     = document.getElementById('meds-add-btn')
+const medsList       = document.getElementById('meds-list')
+const medFormOverlay = document.getElementById('med-form-overlay')
+const medFormTitle   = document.getElementById('med-form-title')
+const medFormSave    = document.getElementById('med-form-save')
+const medFormCancel  = document.getElementById('med-form-cancel')
+const medNameInput   = document.getElementById('med-name')
+const medDosageInput = document.getElementById('med-dosage')
+const medTimeInput   = document.getElementById('med-time')
+const medFreqInput   = document.getElementById('med-frequency')
+const medNotesInput  = document.getElementById('med-notes')
 
 // ── Auth state ───────────────────────────────────────────
 
@@ -377,6 +394,187 @@ function appendMessage (role, content) {
   messagesEl.appendChild(div)
   messagesEl.scrollTop = messagesEl.scrollHeight
   return div
+}
+
+// ── Medications ───────────────────────────────────────────
+
+function showMedsView () {
+  chatSection.classList.add('hidden')
+  medsSection.classList.remove('hidden')
+  loadMedicationsFromDB().then(meds => {
+    _medications = meds
+    renderMedications()
+  })
+}
+
+function showChatView () {
+  medsSection.classList.add('hidden')
+  chatSection.classList.remove('hidden')
+}
+
+medsBtn.addEventListener('click', showMedsView)
+medsBack.addEventListener('click', showChatView)
+medsAddBtn.addEventListener('click', () => showMedForm(null))
+
+async function loadMedicationsFromDB () {
+  const { data, error } = await sb
+    .from('medications')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .order('time_of_day', { ascending: true })
+
+  if (error) {
+    medsList.innerHTML = '<p class="meds-empty" style="color:var(--danger)">Medikamente konnten nicht geladen werden.</p>'
+    return []
+  }
+
+  return (data ?? []).map(med => ({
+    id:        med.id,
+    name:      med.name,
+    dosage:    med.dosage ?? '',
+    time:      med.time_of_day ? String(med.time_of_day).slice(0, 5) : '08:00',
+    notes:     med.notes ?? '',
+    frequency: med.frequency ?? 'daily',
+    active:    med.active ?? true,
+  }))
+}
+
+function renderMedications () {
+  if (!_medications.length) {
+    medsList.innerHTML = '<p class="meds-empty">Noch keine Medikamente eingetragen.<br>Tippen Sie auf „+ Hinzufügen".</p>'
+    return
+  }
+
+  medsList.innerHTML = ''
+  const freqLabel = { daily: 'Täglich', weekly: 'Wöchentlich', as_needed: 'Bei Bedarf' }
+
+  _medications.forEach(med => {
+    const card = document.createElement('div')
+    card.className = 'med-card' + (med.active ? '' : ' inactive')
+
+    const meta = [
+      med.dosage && med.dosage,
+      med.time && med.time + ' Uhr',
+      freqLabel[med.frequency] ?? med.frequency,
+    ].filter(Boolean).join(' · ')
+
+    card.innerHTML = `
+      <div class="med-card-header">
+        <span class="med-name">${escapeHtml(med.name)}</span>
+        <label class="med-toggle" title="${med.active ? 'Aktiv' : 'Inaktiv'}">
+          <input type="checkbox" ${med.active ? 'checked' : ''}>
+          <span class="med-toggle-slider"></span>
+        </label>
+      </div>
+      ${meta ? `<span class="med-meta">${escapeHtml(meta)}</span>` : ''}
+      ${med.notes ? `<span class="med-notes">${escapeHtml(med.notes)}</span>` : ''}
+      <div class="med-card-actions">
+        <button class="btn-edit">Bearbeiten</button>
+        <button class="btn-delete">Löschen</button>
+      </div>
+    `
+
+    // Toggle active
+    const toggle = card.querySelector('input[type="checkbox"]')
+    toggle.addEventListener('change', async () => {
+      const ok = await updateMedicationActiveInDB(med.id, toggle.checked)
+      if (!ok) { toggle.checked = !toggle.checked; return }
+      med.active = toggle.checked
+      card.classList.toggle('inactive', !med.active)
+    })
+
+    // Edit
+    card.querySelector('.btn-edit').addEventListener('click', () => showMedForm(med))
+
+    // Delete
+    card.querySelector('.btn-delete').addEventListener('click', () => {
+      showConfirm(
+        `„${med.name}" wirklich löschen?`,
+        'Ja, löschen',
+        async () => {
+          await deleteMedicationFromDB(med.id)
+          _medications = await loadMedicationsFromDB()
+          renderMedications()
+        }
+      )
+    })
+
+    medsList.appendChild(card)
+  })
+}
+
+function showMedForm (med) {
+  _editingMedId            = med?.id ?? null
+  medFormTitle.textContent = med ? 'Medikament bearbeiten' : 'Medikament hinzufügen'
+  medNameInput.value       = med?.name      ?? ''
+  medDosageInput.value     = med?.dosage    ?? ''
+  medTimeInput.value       = med?.time      ?? '08:00'
+  medFreqInput.value       = med?.frequency ?? 'daily'
+  medNotesInput.value      = med?.notes     ?? ''
+  medFormOverlay.classList.remove('hidden')
+  medNameInput.focus()
+}
+
+function hideMedForm () {
+  medFormOverlay.classList.add('hidden')
+  _editingMedId = null
+}
+
+medFormCancel.addEventListener('click', hideMedForm)
+
+medFormSave.addEventListener('click', async () => {
+  const name = medNameInput.value.trim()
+  if (!name) { medNameInput.focus(); return }
+
+  const med = {
+    id:        _editingMedId,
+    name,
+    dosage:    medDosageInput.value.trim(),
+    time:      medTimeInput.value,
+    frequency: medFreqInput.value,
+    notes:     medNotesInput.value.trim(),
+    active:    true,
+  }
+
+  const ok = await saveMedicationToDB(med)
+  if (!ok) {
+    showBanner('Medikament konnte nicht gespeichert werden.', true)
+    return
+  }
+
+  hideMedForm()
+  _medications = await loadMedicationsFromDB()
+  renderMedications()
+})
+
+async function saveMedicationToDB (med) {
+  const payload = {
+    user_id:     currentUser.id,
+    name:        med.name,
+    dosage:      med.dosage || null,
+    frequency:   med.frequency ?? 'daily',
+    time_of_day: med.time ? med.time + ':00' : null,
+    notes:       med.notes || null,
+    active:      med.active ?? true,
+  }
+
+  if (med.id) {
+    const { error } = await sb.from('medications').update(payload).eq('id', med.id).eq('user_id', currentUser.id)
+    return !error
+  } else {
+    const { error } = await sb.from('medications').insert([payload])
+    return !error
+  }
+}
+
+async function deleteMedicationFromDB (id) {
+  const { error } = await sb.from('medications').delete().eq('id', id).eq('user_id', currentUser.id)
+  return !error
+}
+
+async function updateMedicationActiveInDB (id, active) {
+  const { error } = await sb.from('medications').update({ active }).eq('id', id).eq('user_id', currentUser.id)
+  return !error
 }
 
 // ── Send ──────────────────────────────────────────────────

@@ -56,6 +56,7 @@
         <button class="btn-icon" id="new-conv-btn" title="Neues Gespräch">
           + Neu
         </button>
+        <button class="btn-icon" id="meds-btn">Medikamente</button>
         <button class="btn-icon" id="logout-btn">
           Abmelden
         </button>
@@ -74,16 +75,27 @@
 
       <!-- ── CHAT ─────────────────────────────────────── -->
       <div class="chat-area">
-        <div id="messages" role="log" aria-live="polite" aria-label="Gespräch"></div>
+        <div id="chat-section">
+          <div id="messages" role="log" aria-live="polite" aria-label="Gespräch"></div>
 
-        <div class="input-bar">
-          <textarea
-            id="message-input"
-            rows="1"
-            placeholder="Schreiben Sie hier …"
-            aria-label="Nachricht eingeben"
-          ></textarea>
-          <button id="send-btn" aria-label="Senden" disabled>Senden</button>
+          <div class="input-bar">
+            <textarea
+              id="message-input"
+              rows="1"
+              placeholder="Schreiben Sie hier …"
+              aria-label="Nachricht eingeben"
+            ></textarea>
+            <button id="send-btn" aria-label="Senden" disabled>Senden</button>
+          </div>
+        </div>
+
+        <div id="meds-section" class="hidden">
+          <div class="meds-toolbar">
+            <button class="btn-icon" id="meds-back">← Chat</button>
+            <h2>Meine Medikamente</h2>
+            <button class="btn-icon" id="meds-add-btn">+ Hinzufügen</button>
+          </div>
+          <div id="meds-list"></div>
         </div>
       </div>
 
@@ -101,9 +113,44 @@
     </div>
   </div>
 
+  <!-- Medikament Formular -->
+  <div id="med-form-overlay" class="hidden" role="dialog" aria-modal="true">
+    <div class="med-form-card">
+      <h3 id="med-form-title">Medikament hinzufügen</h3>
+      <div class="form-group">
+        <label for="med-name">Name *</label>
+        <input id="med-name" type="text" placeholder="z.B. Aspirin" />
+      </div>
+      <div class="form-group">
+        <label for="med-dosage">Dosierung</label>
+        <input id="med-dosage" type="text" placeholder="z.B. 100 mg" />
+      </div>
+      <div class="form-group">
+        <label for="med-time">Uhrzeit</label>
+        <input id="med-time" type="time" value="08:00" />
+      </div>
+      <div class="form-group">
+        <label for="med-frequency">Häufigkeit</label>
+        <select id="med-frequency">
+          <option value="daily">Täglich</option>
+          <option value="weekly">Wöchentlich</option>
+          <option value="as_needed">Bei Bedarf</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="med-notes">Notizen</label>
+        <textarea id="med-notes" rows="2" placeholder="z.B. zum Essen nehmen"></textarea>
+      </div>
+      <div class="med-form-actions">
+        <button class="btn btn-primary" id="med-form-save">Speichern</button>
+        <button class="btn btn-secondary" id="med-form-cancel">Abbrechen</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=26"></script>
+  <script src="app.js?v=27"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')

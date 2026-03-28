@@ -419,6 +419,177 @@ html, body {
 .btn-confirm-yes  { background: var(--danger); color: #fff; }
 .btn-confirm-no   { background: var(--green-pale); color: var(--green); }
 
+/* ── MEDICATIONS ────────────────────────────────────────── */
+
+#meds-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+#meds-section.hidden { display: none; }
+#chat-section { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+.meds-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.meds-toolbar h2 {
+  flex: 1;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--green);
+}
+
+#meds-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.med-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: opacity 0.2s;
+}
+
+.med-card.inactive { opacity: 0.5; }
+
+.med-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.med-name {
+  flex: 1;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.med-meta {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.med-notes {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.med-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.med-card-actions button {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.med-card-actions .btn-edit:hover   { background: var(--green-pale); color: var(--green); }
+.med-card-actions .btn-delete:hover { background: #fdecea; color: var(--danger); }
+
+/* Toggle switch */
+.med-toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.med-toggle input { opacity: 0; width: 0; height: 0; }
+
+.med-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #ccc;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.med-toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 18px; height: 18px;
+  left: 3px; top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.med-toggle input:checked + .med-toggle-slider { background: var(--green); }
+.med-toggle input:checked + .med-toggle-slider::before { transform: translateX(20px); }
+
+.meds-empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1.7;
+  padding: 48px 24px;
+}
+
+/* Medication form modal */
+#med-form-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 100;
+  overflow-y: auto;
+}
+
+#med-form-overlay.hidden { display: none; }
+
+.med-form-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 32px;
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.med-form-card h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.med-form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
 /* ── RESPONSIVE ────────────────────────────────────────── */
 
 @media (max-width: 700px) {
