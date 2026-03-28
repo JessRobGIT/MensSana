@@ -1,0 +1,11 @@
+{
+  "name": "MensSana",
+  "short_name": "MensSana",
+  "description": "Gespräch, Orientierung und Begleitung im Alltag",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f3ee",
+  "theme_color": "#2d6a4f",
+  "lang": "de",
+  "icons": []
+}
