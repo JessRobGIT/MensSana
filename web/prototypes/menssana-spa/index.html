@@ -171,8 +171,24 @@
         <input id="cal-date" type="date" />
       </div>
       <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="cal-allday" />
+          Ganztägig
+        </label>
+      </div>
+      <div class="form-group" id="cal-time-group">
         <label for="cal-time">Uhrzeit</label>
         <input id="cal-time" type="time" value="09:00" />
+      </div>
+      <div class="form-group">
+        <label for="cal-recurring">Wiederholung</label>
+        <select id="cal-recurring">
+          <option value="once">Einmalig</option>
+          <option value="daily">Täglich</option>
+          <option value="weekly">Wöchentlich</option>
+          <option value="monthly">Monatlich</option>
+          <option value="yearly">Jährlich</option>
+        </select>
       </div>
       <div class="form-group">
         <label for="cal-notes">Notizen</label>
@@ -187,7 +203,7 @@
 
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=28"></script>
+  <script src="app.js?v=29"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')

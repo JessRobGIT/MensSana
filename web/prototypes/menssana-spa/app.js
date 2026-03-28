@@ -42,14 +42,17 @@ const calSection     = document.getElementById('calendar-section')
 const calBack        = document.getElementById('calendar-back')
 const calAddBtn      = document.getElementById('calendar-add-btn')
 const calList        = document.getElementById('cal-list')
-const calFormOverlay = document.getElementById('cal-form-overlay')
-const calFormTitle   = document.getElementById('cal-form-title')
-const calFormSave    = document.getElementById('cal-form-save')
-const calFormCancel  = document.getElementById('cal-form-cancel')
-const calTitleInput  = document.getElementById('cal-title')
-const calDateInput   = document.getElementById('cal-date')
-const calTimeInput   = document.getElementById('cal-time')
-const calNotesInput  = document.getElementById('cal-notes')
+const calFormOverlay    = document.getElementById('cal-form-overlay')
+const calFormTitle      = document.getElementById('cal-form-title')
+const calFormSave       = document.getElementById('cal-form-save')
+const calFormCancel     = document.getElementById('cal-form-cancel')
+const calTitleInput     = document.getElementById('cal-title')
+const calDateInput      = document.getElementById('cal-date')
+const calAlldayInput    = document.getElementById('cal-allday')
+const calTimeGroup      = document.getElementById('cal-time-group')
+const calTimeInput      = document.getElementById('cal-time')
+const calRecurringInput = document.getElementById('cal-recurring')
+const calNotesInput     = document.getElementById('cal-notes')
 const medFormOverlay = document.getElementById('med-form-overlay')
 const medFormTitle   = document.getElementById('med-form-title')
 const medFormSave    = document.getElementById('med-form-save')
@@ -626,6 +629,7 @@ async function loadCalendarFromDB () {
       time:       `${hh}:${mm}`,
       notes:      entry.description ?? '',
       allDay:     entry.all_day ?? false,
+      frequency:  entry.frequency ?? 'once',
       startsAt:   entry.starts_at,
       endsAt:     entry.ends_at,
       reminderAt: entry.reminder_at,
@@ -633,8 +637,10 @@ async function loadCalendarFromDB () {
   })
 }
 
+const freqLabel = { once: '', daily: 'Täglich', weekly: 'Wöchentlich', monthly: 'Monatlich', yearly: 'Jährlich' }
+
 function formatCalDate (dateStr, timeStr, allDay) {
-  const d = new Date(dateStr + 'T12:00:00')
+  const d   = new Date(dateStr + 'T12:00:00')
   const day = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   return allDay ? day : `${day}, ${timeStr} Uhr`
 }
@@ -647,10 +653,13 @@ function renderCalendar () {
 
   calList.innerHTML = ''
   _calendarEntries.forEach(entry => {
+    const recurringBadge = entry.frequency && entry.frequency !== 'once'
+      ? ` · ${freqLabel[entry.frequency] ?? entry.frequency}`
+      : ''
     const card = document.createElement('div')
     card.className = 'cal-entry-card'
     card.innerHTML = `
-      <span class="cal-entry-date">${formatCalDate(entry.date, entry.time, entry.allDay)}</span>
+      <span class="cal-entry-date">${formatCalDate(entry.date, entry.time, entry.allDay)}${recurringBadge}</span>
       <span class="cal-entry-title">${escapeHtml(entry.title)}</span>
       ${entry.notes ? `<span class="cal-entry-notes">${escapeHtml(entry.notes)}</span>` : ''}
       <div class="cal-entry-actions">
@@ -678,13 +687,20 @@ function renderCalendar () {
   })
 }
 
+calAlldayInput.addEventListener('change', () => {
+  calTimeGroup.style.display = calAlldayInput.checked ? 'none' : ''
+})
+
 function showCalendarForm (entry) {
-  _editingCalId              = entry?.id ?? null
-  calFormTitle.textContent   = entry ? 'Termin bearbeiten' : 'Termin hinzufügen'
-  calTitleInput.value        = entry?.title ?? ''
-  calDateInput.value         = entry?.date  ?? new Date().toISOString().slice(0, 10)
-  calTimeInput.value         = entry?.time  ?? '09:00'
-  calNotesInput.value        = entry?.notes ?? ''
+  _editingCalId                = entry?.id ?? null
+  calFormTitle.textContent     = entry ? 'Termin bearbeiten' : 'Termin hinzufügen'
+  calTitleInput.value          = entry?.title     ?? ''
+  calDateInput.value           = entry?.date      ?? new Date().toISOString().slice(0, 10)
+  calAlldayInput.checked       = entry?.allDay    ?? false
+  calTimeGroup.style.display   = (entry?.allDay)  ? 'none' : ''
+  calTimeInput.value           = entry?.time      ?? '09:00'
+  calRecurringInput.value      = entry?.frequency ?? 'once'
+  calNotesInput.value          = entry?.notes     ?? ''
   calFormOverlay.classList.remove('hidden')
   calTitleInput.focus()
 }
@@ -700,13 +716,15 @@ calFormSave.addEventListener('click', async () => {
   const title = calTitleInput.value.trim()
   if (!title) { calTitleInput.focus(); return }
 
+  const allDay = calAlldayInput.checked
   const ok = await saveCalendarEntryToDB({
-    id:    _editingCalId,
+    id:        _editingCalId,
     title,
-    date:  calDateInput.value,
-    time:  calTimeInput.value,
-    notes: calNotesInput.value.trim(),
-    allDay: false,
+    date:      calDateInput.value,
+    time:      allDay ? '00:00' : calTimeInput.value,
+    notes:     calNotesInput.value.trim(),
+    allDay,
+    frequency: calRecurringInput.value,
   })
 
   if (!ok) { showBanner('Termin konnte nicht gespeichert werden.', true); return }
@@ -725,6 +743,7 @@ async function saveCalendarEntryToDB (entry) {
     starts_at:   startsAt,
     ends_at:     entry.endsAt ?? null,
     all_day:     entry.allDay ?? false,
+    frequency:   entry.frequency ?? 'once',
     reminder_at: entry.reminderAt ?? null,
   }
 
