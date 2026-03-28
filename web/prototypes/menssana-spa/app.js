@@ -35,17 +35,14 @@ async function initApp (user) {
   currentUser = user
   headerUser.textContent = user.email
   showApp()
-  messagesEl.innerHTML = '<div class="message assistant">Initialisierung…</div>'
-  try {
-    await loadOrCreateConversation()
-    if (!currentConversation) {
-      messagesEl.innerHTML = '<div class="message assistant">FEHLER: Kein Gespräch geladen. Bitte laden Sie die Seite neu.</div>'
-      return
-    }
-    await loadMessages()
-  } catch (err) {
-    messagesEl.innerHTML = `<div class="message assistant">FEHLER: ${err?.message ?? err}</div>`
+
+  if (!navigator.onLine) {
+    updateOnlineStatus()
+    return
   }
+
+  await loadOrCreateConversation()
+  await loadMessages()
 }
 
 sb.auth.onAuthStateChange((event, session) => {
@@ -321,6 +318,9 @@ function updateOnlineStatus () {
   } else {
     showBanner('')
     sendBtn.disabled = false
+    if (currentUser && !currentConversation) {
+      loadOrCreateConversation().then(() => loadMessages())
+    }
   }
 }
 window.addEventListener('offline', updateOnlineStatus)
