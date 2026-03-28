@@ -103,7 +103,14 @@ function formatAuthError (error) {
 }
 
 // ── Logout ───────────────────────────────────────────────
-logoutBtn.addEventListener('click', () => sb.auth.signOut())
+logoutBtn.addEventListener('click', async () => {
+  logoutBtn.disabled = true
+  const { error } = await sb.auth.signOut()
+  if (error) {
+    showBanner('Abmelden fehlgeschlagen: ' + error.message, true)
+    logoutBtn.disabled = false
+  }
+})
 
 // ── Status banner ─────────────────────────────────────────
 function showBanner (msg, isError = false) {
