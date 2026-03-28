@@ -337,13 +337,13 @@ async function sendMessage () {
       const errBody = await fnRes.text()
       showBanner(`Fehler ${fnRes.status}: ${errBody}`, true)
     }
-    const reply = fnJson?.content
-      ?? 'Entschuldigung, ich konnte gerade nicht antworten. Bitte versuchen Sie es noch einmal.'
+    const reply = fnJson?.content?.trim() ||
+      'Entschuldigung, ich konnte gerade nicht antworten. Bitte versuchen Sie es noch einmal.'
 
     appendMessage('assistant', reply)
 
     // Persist assistant message
-    if (fnJson?.content) {
+    if (fnJson?.content?.trim()) {
       await sb.from('messages').insert({
         conversation_id: currentConversation.id,
         role:            'assistant',
