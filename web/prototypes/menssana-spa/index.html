@@ -70,9 +70,20 @@
     </div>
   </div>
 
+  <!-- Bestätigungs-Dialog -->
+  <div id="confirm-overlay" class="hidden" role="dialog" aria-modal="true">
+    <div class="confirm-card">
+      <p id="confirm-text"></p>
+      <div class="confirm-actions">
+        <button class="btn-confirm-yes" id="confirm-yes">Ja</button>
+        <button class="btn-confirm-no"  id="confirm-no">Abbrechen</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')

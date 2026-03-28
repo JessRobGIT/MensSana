@@ -264,6 +264,57 @@ html, body {
 #send-btn:hover:not(:disabled) { background: #245a42; }
 #send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* ── CONFIRM DIALOG ────────────────────────────────────── */
+
+#confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 100;
+}
+
+#confirm-overlay.hidden { display: none; }
+
+.confirm-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  padding: 40px 32px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+}
+
+.confirm-card p {
+  font-size: 1.2rem;
+  line-height: 1.5;
+  margin-bottom: 32px;
+  color: var(--text);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.confirm-actions button {
+  flex: 1;
+  padding: 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-confirm-yes  { background: var(--danger); color: #fff; }
+.btn-confirm-no   { background: var(--green-pale); color: var(--green); }
+
 /* ── RESPONSIVE ────────────────────────────────────────── */
 
 @media (max-width: 600px) {

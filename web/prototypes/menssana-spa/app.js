@@ -141,14 +141,38 @@ function formatAuthError (error) {
   return map[error.message] ?? error.message
 }
 
+// ── Confirm dialog ────────────────────────────────────────
+const confirmOverlay = document.getElementById('confirm-overlay')
+const confirmText    = document.getElementById('confirm-text')
+const confirmYes     = document.getElementById('confirm-yes')
+const confirmNo      = document.getElementById('confirm-no')
+
+function showConfirm (message, yesLabel, onConfirm) {
+  confirmText.textContent  = message
+  confirmYes.textContent   = yesLabel
+  confirmOverlay.classList.remove('hidden')
+  confirmYes.focus()
+
+  const cleanup = () => confirmOverlay.classList.add('hidden')
+
+  confirmYes.onclick = () => { cleanup(); onConfirm() }
+  confirmNo.onclick  = cleanup
+}
+
 // ── Logout ───────────────────────────────────────────────
-logoutBtn.addEventListener('click', async () => {
-  logoutBtn.disabled = true
-  const { error } = await sb.auth.signOut()
-  if (error) {
-    showBanner('Abmelden fehlgeschlagen: ' + error.message, true)
-    logoutBtn.disabled = false
-  }
+logoutBtn.addEventListener('click', () => {
+  showConfirm(
+    'Möchten Sie sich wirklich abmelden?',
+    'Ja, abmelden',
+    async () => {
+      logoutBtn.disabled = true
+      const { error } = await sb.auth.signOut()
+      if (error) {
+        showBanner('Abmelden fehlgeschlagen: ' + error.message, true)
+        logoutBtn.disabled = false
+      }
+    }
+  )
 })
 
 // ── Status banner ─────────────────────────────────────────
@@ -204,10 +228,16 @@ async function createNewConversation () {
   currentConversation = data
 }
 
-newConvBtn.addEventListener('click', async () => {
-  await createNewConversation()
-  messagesEl.innerHTML = ''
-  appendWelcome()
+newConvBtn.addEventListener('click', () => {
+  showConfirm(
+    'Möchten Sie ein neues Gespräch beginnen? Das aktuelle Gespräch bleibt gespeichert.',
+    'Ja, neu starten',
+    async () => {
+      await createNewConversation()
+      messagesEl.innerHTML = ''
+      appendWelcome()
+    }
+  )
 })
 
 // ── Messages ──────────────────────────────────────────────
