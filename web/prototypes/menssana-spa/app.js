@@ -313,6 +313,19 @@ async function sendMessage () {
   }
 }
 
+// ── Offline detection ─────────────────────────────────────
+function updateOnlineStatus () {
+  if (!navigator.onLine) {
+    showBanner('Kein Internet — Gespräche können gerade nicht gesendet werden.', true)
+    sendBtn.disabled = true
+  } else {
+    showBanner('')
+    sendBtn.disabled = false
+  }
+}
+window.addEventListener('offline', updateOnlineStatus)
+window.addEventListener('online',  updateOnlineStatus)
+
 sendBtn.addEventListener('click', sendMessage)
 
 messageInput.addEventListener('keydown', (e) => {

@@ -72,6 +72,11 @@
 
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=13"></script>
+  <script src="app.js?v=14"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/MensSana/sw.js')
+    }
+  </script>
 </body>
 </html>
