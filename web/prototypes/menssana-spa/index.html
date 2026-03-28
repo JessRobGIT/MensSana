@@ -45,7 +45,12 @@
   <!-- ── APP ─────────────────────────────────────────── -->
   <div id="app-view">
     <header class="app-header">
-      <h1>MensSana</h1>
+      <div class="header-left">
+        <button class="btn-icon" id="history-toggle-btn" title="Meine Gespräche">
+          ☰
+        </button>
+        <h1>MensSana</h1>
+      </div>
       <div class="header-right">
         <span class="header-user" id="header-user"></span>
         <button class="btn-icon" id="new-conv-btn" title="Neues Gespräch">
@@ -57,16 +62,31 @@
       </div>
     </header>
 
-    <div id="messages" role="log" aria-live="polite" aria-label="Gespräch"></div>
+    <div class="app-body">
 
-    <div class="input-bar">
-      <textarea
-        id="message-input"
-        rows="1"
-        placeholder="Schreiben Sie hier …"
-        aria-label="Nachricht eingeben"
-      ></textarea>
-      <button id="send-btn" aria-label="Senden" disabled>Senden</button>
+      <!-- ── HISTORY SIDEBAR ──────────────────────────── -->
+      <aside id="history-panel" class="hidden" aria-label="Gesprächsverlauf">
+        <div class="history-header">
+          <h2>Meine Gespräche</h2>
+        </div>
+        <div id="conversation-list" role="list"></div>
+      </aside>
+
+      <!-- ── CHAT ─────────────────────────────────────── -->
+      <div class="chat-area">
+        <div id="messages" role="log" aria-live="polite" aria-label="Gespräch"></div>
+
+        <div class="input-bar">
+          <textarea
+            id="message-input"
+            rows="1"
+            placeholder="Schreiben Sie hier …"
+            aria-label="Nachricht eingeben"
+          ></textarea>
+          <button id="send-btn" aria-label="Senden" disabled>Senden</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -83,7 +103,7 @@
 
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=23"></script>
+  <script src="app.js?v=24"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')

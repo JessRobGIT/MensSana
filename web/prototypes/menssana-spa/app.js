@@ -13,19 +13,22 @@ let isSending           = false
 let appInitialized      = false
 
 // ── DOM refs ─────────────────────────────────────────────
-const loginView    = document.getElementById('login-view')
-const appView      = document.getElementById('app-view')
-const loginForm    = document.getElementById('login-form')
-const signupBtn    = document.getElementById('signup-btn')
-const loginStatus  = document.getElementById('login-status')
-const emailInput   = document.getElementById('email')
-const passwordInput= document.getElementById('password')
-const messagesEl   = document.getElementById('messages')
-const messageInput = document.getElementById('message-input')
-const sendBtn      = document.getElementById('send-btn')
-const logoutBtn    = document.getElementById('logout-btn')
-const newConvBtn   = document.getElementById('new-conv-btn')
-const headerUser   = document.getElementById('header-user')
+const loginView       = document.getElementById('login-view')
+const appView         = document.getElementById('app-view')
+const loginForm       = document.getElementById('login-form')
+const signupBtn       = document.getElementById('signup-btn')
+const loginStatus     = document.getElementById('login-status')
+const emailInput      = document.getElementById('email')
+const passwordInput   = document.getElementById('password')
+const messagesEl      = document.getElementById('messages')
+const messageInput    = document.getElementById('message-input')
+const sendBtn         = document.getElementById('send-btn')
+const logoutBtn       = document.getElementById('logout-btn')
+const newConvBtn      = document.getElementById('new-conv-btn')
+const headerUser      = document.getElementById('header-user')
+const historyPanel    = document.getElementById('history-panel')
+const historyToggle   = document.getElementById('history-toggle-btn')
+const convList        = document.getElementById('conversation-list')
 
 // ── Auth state ───────────────────────────────────────────
 
@@ -52,6 +55,7 @@ async function initApp (user) {
   showApp()
   await loadOrCreateConversation()
   await loadMessages()
+  await loadConversations()
 }
 
 sb.auth.onAuthStateChange((event, session) => {
@@ -190,6 +194,100 @@ function showBanner (msg, isError = false) {
   if (!msg) banner.remove()
 }
 
+// ── History panel ─────────────────────────────────────────
+historyToggle.addEventListener('click', () => {
+  historyPanel.classList.toggle('hidden')
+})
+
+function formatConvDate (iso) {
+  const d = new Date(iso)
+  const today = new Date()
+  const isToday = d.toDateString() === today.toDateString()
+  if (isToday) {
+    return 'Heute, ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+  }
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+         ', ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+}
+
+async function loadConversations () {
+  const { data, error } = await sb
+    .from('conversations')
+    .select('id, title, updated_at, messages(role, content, created_at)')
+    .eq('user_id', currentUser.id)
+    .order('updated_at', { ascending: false })
+    .limit(50)
+
+  if (error) {
+    convList.innerHTML = `<p class="history-error">Gespräche konnten nicht geladen werden.</p>`
+    return
+  }
+
+  if (!data?.length) {
+    convList.innerHTML = `<p class="history-empty">Noch keine Gespräche.<br>Schreiben Sie einfach los!</p>`
+    return
+  }
+
+  convList.innerHTML = ''
+  data.forEach(conv => {
+    const msgs = (conv.messages ?? []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    const lastMsg = msgs.at(-1)
+    const preview = lastMsg?.content?.slice(0, 60) + (lastMsg?.content?.length > 60 ? '…' : '')
+                    || 'Kein Inhalt'
+
+    const btn = document.createElement('button')
+    btn.className = 'conv-item' + (conv.id === currentConversation?.id ? ' active' : '')
+    btn.setAttribute('role', 'listitem')
+    btn.innerHTML = `
+      <span class="conv-date">${formatConvDate(conv.updated_at)}</span>
+      <span class="conv-preview">${escapeHtml(preview)}</span>
+      <button class="conv-delete" data-id="${conv.id}" title="Gespräch löschen">Löschen</button>
+    `
+    btn.addEventListener('click', (e) => {
+      if (e.target.classList.contains('conv-delete')) return
+      openConversation(conv)
+    })
+    btn.querySelector('.conv-delete').addEventListener('click', (e) => {
+      e.stopPropagation()
+      showConfirm(
+        'Dieses Gespräch und alle Nachrichten darin löschen?',
+        'Ja, löschen',
+        () => deleteConversation(conv.id)
+      )
+    })
+    convList.appendChild(btn)
+  })
+}
+
+function escapeHtml (str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+async function openConversation (conv) {
+  currentConversation = conv
+  await loadMessages()
+  // Mark active in list
+  convList.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'))
+  const active = [...convList.querySelectorAll('.conv-item')]
+    .find(el => el.querySelector('.conv-delete')?.dataset.id === conv.id)
+  if (active) active.classList.add('active')
+  // On mobile: close panel after selecting
+  if (window.innerWidth < 700) historyPanel.classList.add('hidden')
+}
+
+async function deleteConversation (id) {
+  await sb.from('messages').delete().eq('conversation_id', id)
+  await sb.from('conversations').delete().eq('id', id)
+
+  if (currentConversation?.id === id) {
+    currentConversation = null
+    messagesEl.innerHTML = ''
+    await loadOrCreateConversation()
+    await loadMessages()
+  }
+  await loadConversations()
+}
+
 // ── Conversations ─────────────────────────────────────────
 async function loadOrCreateConversation () {
   const { data, error } = await sb
@@ -236,6 +334,7 @@ newConvBtn.addEventListener('click', () => {
       await createNewConversation()
       messagesEl.innerHTML = ''
       appendWelcome()
+      await loadConversations()
     }
   )
 })
@@ -351,11 +450,12 @@ async function sendMessage () {
       })
     }
 
-    // Update conversation timestamp
+    // Update conversation timestamp + refresh history list
     await sb
       .from('conversations')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', currentConversation.id)
+    await loadConversations()
 
   } catch (err) {
     if (typingEl) typingEl.remove()
