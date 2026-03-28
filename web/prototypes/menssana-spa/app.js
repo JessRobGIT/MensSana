@@ -182,36 +182,39 @@ async function sendMessage () {
   messageInput.value   = ''
   autoResize()
 
-  appendMessage('user', text)
-
-  // Persist user message
-  await sb.from('messages').insert({
-    conversation_id: currentConversation.id,
-    role:            'user',
-    content:         text,
-  })
-
-  // Fetch recent history for context (last 20 messages)
-  const { data: history } = await sb
-    .from('messages')
-    .select('role, content')
-    .eq('conversation_id', currentConversation.id)
-    .order('created_at', { ascending: true })
-    .limit(20)
-
-  // Typing indicator
-  const typingEl     = document.createElement('div')
-  typingEl.className = 'message assistant typing'
-  typingEl.textContent = '…'
-  messagesEl.appendChild(typingEl)
-  messagesEl.scrollTop = messagesEl.scrollHeight
+  let typingEl = null
 
   try {
+    appendMessage('user', text)
+
+    // Persist user message
+    await sb.from('messages').insert({
+      conversation_id: currentConversation.id,
+      role:            'user',
+      content:         text,
+    })
+
+    // Fetch recent history for context (last 20 messages)
+    const { data: history } = await sb
+      .from('messages')
+      .select('role, content')
+      .eq('conversation_id', currentConversation.id)
+      .order('created_at', { ascending: true })
+      .limit(20)
+
+    // Typing indicator
+    typingEl             = document.createElement('div')
+    typingEl.className   = 'message assistant typing'
+    typingEl.textContent = '…'
+    messagesEl.appendChild(typingEl)
+    messagesEl.scrollTop = messagesEl.scrollHeight
+
     const { data: fnData, error: fnError } = await sb.functions.invoke('chat', {
       body: { messages: history ?? [] },
     })
 
     typingEl.remove()
+    typingEl = null
 
     const reply = fnError
       ? 'Entschuldigung, ich konnte gerade nicht antworten. Bitte versuchen Sie es noch einmal.'
@@ -235,13 +238,13 @@ async function sendMessage () {
       .eq('id', currentConversation.id)
 
   } catch (_err) {
-    typingEl.remove()
+    if (typingEl) typingEl.remove()
     appendMessage('assistant', 'Entschuldigung, es ist ein Fehler aufgetreten.')
+  } finally {
+    isSending        = false
+    sendBtn.disabled = false
+    messageInput.focus()
   }
-
-  isSending        = false
-  sendBtn.disabled = false
-  messageInput.focus()
 }
 
 sendBtn.addEventListener('click', sendMessage)
