@@ -27,16 +27,23 @@ const newConvBtn   = document.getElementById('new-conv-btn')
 const headerUser   = document.getElementById('header-user')
 
 // ── Auth state ───────────────────────────────────────────
-sb.auth.onAuthStateChange(async (_event, session) => {
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'SIGNED_OUT') {
+    currentUser         = null
+    currentConversation = null
+    showLogin()
+    return
+  }
+
   if (session?.user) {
     currentUser = session.user
     headerUser.textContent = currentUser.email
     showApp()
-    await loadOrCreateConversation()
-    await loadMessages()
-  } else {
-    currentUser         = null
-    currentConversation = null
+    if (!currentConversation) {
+      await loadOrCreateConversation()
+      await loadMessages()
+    }
+  } else if (event === 'INITIAL_SESSION') {
     showLogin()
   }
 })
