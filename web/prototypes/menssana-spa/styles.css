@@ -429,6 +429,7 @@ html, body {
 }
 
 #meds-section.hidden { display: none; }
+#chat-section.hidden { display: none; }
 #chat-section { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 
 .meds-toolbar {
@@ -446,6 +447,16 @@ html, body {
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--green);
+}
+
+.meds-toolbar .btn-icon {
+  background: var(--green-pale);
+  color: var(--green);
+}
+
+.meds-toolbar .btn-icon:hover {
+  background: var(--green);
+  color: #fff;
 }
 
 #meds-list {
