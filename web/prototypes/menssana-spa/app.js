@@ -231,15 +231,20 @@ async function loadConversations () {
   convList.innerHTML = ''
   data.forEach(conv => {
     const msgs = (conv.messages ?? []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-    const lastMsg = msgs.at(-1)
-    const preview = lastMsg?.content?.slice(0, 60) + (lastMsg?.content?.length > 60 ? '…' : '')
-                    || 'Kein Inhalt'
+
+    // First meaningful assistant reply — best shows what the conversation was about
+    const firstAssistant = msgs.find(m => m.role === 'assistant' && m.content?.trim())
+    const previewRaw = firstAssistant?.content ?? msgs[0]?.content ?? ''
+    const preview    = previewRaw.length > 70 ? previewRaw.slice(0, 70) + '…' : previewRaw || 'Kein Inhalt'
+
+    const msgCount   = msgs.length
+    const countLabel = msgCount === 1 ? '1 Nachricht' : `${msgCount} Nachrichten`
 
     const btn = document.createElement('button')
     btn.className = 'conv-item' + (conv.id === currentConversation?.id ? ' active' : '')
     btn.setAttribute('role', 'listitem')
     btn.innerHTML = `
-      <span class="conv-date">${formatConvDate(conv.updated_at)}</span>
+      <span class="conv-date">${formatConvDate(conv.updated_at)} · ${countLabel}</span>
       <span class="conv-preview">${escapeHtml(preview)}</span>
       <button class="conv-delete" data-id="${conv.id}" title="Gespräch löschen">Löschen</button>
     `
