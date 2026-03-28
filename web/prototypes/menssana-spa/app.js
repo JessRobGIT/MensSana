@@ -35,8 +35,17 @@ async function initApp (user) {
   currentUser = user
   headerUser.textContent = user.email
   showApp()
-  await loadOrCreateConversation()
-  await loadMessages()
+  messagesEl.innerHTML = '<div class="message assistant">Initialisierung…</div>'
+  try {
+    await loadOrCreateConversation()
+    if (!currentConversation) {
+      messagesEl.innerHTML = '<div class="message assistant">FEHLER: Kein Gespräch geladen. Bitte laden Sie die Seite neu.</div>'
+      return
+    }
+    await loadMessages()
+  } catch (err) {
+    messagesEl.innerHTML = `<div class="message assistant">FEHLER: ${err?.message ?? err}</div>`
+  }
 }
 
 // On page load / reload: restore session from localStorage
