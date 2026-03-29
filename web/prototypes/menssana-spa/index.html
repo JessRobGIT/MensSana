@@ -115,7 +115,8 @@
               <button class="cal-view-tab" data-view="day">Tag</button>
             </div>
           </div>
-          <div id="cal-content"></div>
+          <div id="cal-compact" title="Zum Vergrößern klicken"></div>
+          <div id="cal-entries-list"></div>
         </div>
       </div>
 
@@ -211,9 +212,22 @@
     </div>
   </div>
 
+  <!-- Kalender Vollansicht Modal -->
+  <div id="cal-full-overlay" class="hidden" role="dialog" aria-modal="true">
+    <div class="cal-full-inner">
+      <div class="cal-full-header">
+        <button class="cal-nav-btn" id="cal-full-prev">&#8249;</button>
+        <span id="cal-full-title"></span>
+        <button class="cal-nav-btn" id="cal-full-next">&#8250;</button>
+        <button class="cal-full-close" id="cal-full-close" title="Schließen">&#10005;</button>
+      </div>
+      <div id="cal-full-grid"></div>
+    </div>
+  </div>
+
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=31"></script>
+  <script src="app.js?v=32"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')

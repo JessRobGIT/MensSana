@@ -41,10 +41,17 @@ const calBtn         = document.getElementById('cal-btn')
 const calSection     = document.getElementById('calendar-section')
 const calBack        = document.getElementById('calendar-back')
 const calAddBtn      = document.getElementById('calendar-add-btn')
-const calContent     = document.getElementById('cal-content')
-const calPeriodTitle = document.getElementById('cal-period-title')
-const calPrevBtn     = document.getElementById('cal-prev')
-const calNextBtn     = document.getElementById('cal-next')
+const calCompact      = document.getElementById('cal-compact')
+const calEntriesList  = document.getElementById('cal-entries-list')
+const calPeriodTitle  = document.getElementById('cal-period-title')
+const calPrevBtn      = document.getElementById('cal-prev')
+const calNextBtn      = document.getElementById('cal-next')
+const calFullOverlay  = document.getElementById('cal-full-overlay')
+const calFullGrid     = document.getElementById('cal-full-grid')
+const calFullTitle    = document.getElementById('cal-full-title')
+const calFullPrevBtn  = document.getElementById('cal-full-prev')
+const calFullNextBtn  = document.getElementById('cal-full-next')
+const calFullCloseBtn = document.getElementById('cal-full-close')
 const calFormOverlay    = document.getElementById('cal-form-overlay')
 const calFormTitle      = document.getElementById('cal-form-title')
 const calFormSave       = document.getElementById('cal-form-save')
@@ -613,23 +620,9 @@ let _calDate         = new Date()
 const freqLabel = { once: '', daily: 'Täglich', weekly: 'Wöchentlich', monthly: 'Monatlich', yearly: 'Jährlich' }
 
 function isoDate (d) { return d.toISOString().slice(0, 10) }
+function eventsForDate (dateStr) { return _calendarEntries.filter(e => e.date === dateStr) }
 
-function eventsForDate (dateStr) {
-  return _calendarEntries.filter(e => e.date === dateStr)
-}
-
-// Navigation
-calPrevBtn.addEventListener('click', () => calNavigate(-1))
-calNextBtn.addEventListener('click', () => calNavigate(1))
-
-document.querySelectorAll('.cal-view-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    _calView = tab.dataset.view
-    document.querySelectorAll('.cal-view-tab').forEach(t => t.classList.remove('active'))
-    tab.classList.add('active')
-    renderCalendarView()
-  })
-})
+// ── Navigation ────────────────────────────────────────────
 
 function calNavigate (dir) {
   if (_calView === 'month') {
@@ -639,32 +632,107 @@ function calNavigate (dir) {
   } else {
     _calDate = new Date(_calDate.getTime() + dir * 86400000)
   }
-  renderCalendarView()
 }
 
+calPrevBtn.addEventListener('click', () => { calNavigate(-1); renderCalendarView() })
+calNextBtn.addEventListener('click', () => { calNavigate(1);  renderCalendarView() })
+
+calFullPrevBtn.addEventListener('click', () => { calNavigate(-1); renderFullCalendar(); renderCalendarView() })
+calFullNextBtn.addEventListener('click', () => { calNavigate(1);  renderFullCalendar(); renderCalendarView() })
+calFullCloseBtn.addEventListener('click', closeFullCalendar)
+calFullOverlay.addEventListener('click', e => { if (e.target === calFullOverlay) closeFullCalendar() })
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !calFullOverlay.classList.contains('hidden')) closeFullCalendar()
+})
+
+document.querySelectorAll('.cal-view-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    _calView = tab.dataset.view
+    document.querySelectorAll('.cal-view-tab').forEach(t => t.classList.remove('active'))
+    tab.classList.add('active')
+    renderCalendarView()
+    if (!calFullOverlay.classList.contains('hidden')) renderFullCalendar()
+  })
+})
+
+calCompact.addEventListener('click', e => {
+  if (e.target.classList.contains('cal-event-chip')) return
+  openFullCalendar()
+})
+
+function openFullCalendar () {
+  calFullOverlay.classList.remove('hidden')
+  renderFullCalendar()
+}
+
+function closeFullCalendar () {
+  calFullOverlay.classList.add('hidden')
+}
+
+// ── Render dispatchers ────────────────────────────────────
+
 function renderCalendarView () {
-  if (_calView === 'month')     renderMonthView()
-  else if (_calView === 'week') renderWeekView()
-  else                          renderDayView()
+  renderCalView(calCompact, calPeriodTitle, false)
+  renderEntriesList()
+}
+
+function renderFullCalendar () {
+  renderCalView(calFullGrid, calFullTitle, true)
+}
+
+function renderCalView (container, titleEl, isFull) {
+  if (_calView === 'month')     renderMonthView(container, titleEl, isFull)
+  else if (_calView === 'week') renderWeekView(container, titleEl, isFull)
+  else                          renderDayView(container, titleEl, isFull)
+}
+
+// ── Entries list ──────────────────────────────────────────
+
+function renderEntriesList () {
+  if (!_calendarEntries.length) {
+    calEntriesList.innerHTML = '<p class="cal-list-empty">Noch keine Termine eingetragen.<br>Tippen Sie auf „+ Hinzufügen".</p>'
+    return
+  }
+
+  let html = '<div class="cal-entries-header">Alle Termine</div>'
+  _calendarEntries.forEach(entry => {
+    const d       = new Date(entry.date + 'T12:00:00')
+    const dateStr = d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+    const timeStr = entry.allDay ? 'Ganztägig' : entry.time + ' Uhr'
+    const badge   = entry.frequency && entry.frequency !== 'once' ? ` · ${freqLabel[entry.frequency]}` : ''
+    html += `<div class="cal-list-row" data-id="${entry.id}">
+      <span class="cal-list-date">${escapeHtml(dateStr)}</span>
+      <span class="cal-list-title">${escapeHtml(entry.title)}</span>
+      <span class="cal-list-meta">${timeStr}${badge}</span>
+    </div>`
+  })
+  calEntriesList.innerHTML = html
+
+  calEntriesList.querySelectorAll('.cal-list-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const entry = _calendarEntries.find(e => String(e.id) === row.dataset.id)
+      if (entry) showCalendarForm(entry)
+    })
+  })
 }
 
 // ── Month view ────────────────────────────────────────────
 
-function renderMonthView () {
+function renderMonthView (container, titleEl, isFull) {
   const year     = _calDate.getFullYear()
   const month    = _calDate.getMonth()
   const todayStr = isoDate(new Date())
 
-  calPeriodTitle.textContent = _calDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+  titleEl.textContent = _calDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
 
   const firstDay = new Date(year, month, 1)
   const lastDay  = new Date(year, month + 1, 0)
-  const startDow = (firstDay.getDay() + 6) % 7  // 0 = Montag
+  const startDow = (firstDay.getDay() + 6) % 7
 
   const dayNames = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
   let html = '<div class="cal-month-grid">'
   dayNames.forEach(n => { html += `<div class="cal-month-header">${n}</div>` })
-
   for (let i = 0; i < startDow; i++) html += '<div class="cal-day-cell other-month"></div>'
 
   for (let d = 1; d <= lastDay.getDate(); d++) {
@@ -680,21 +748,21 @@ function renderMonthView () {
   const remainder = (startDow + lastDay.getDate()) % 7
   if (remainder) for (let i = remainder; i < 7; i++) html += '<div class="cal-day-cell other-month"></div>'
   html += '</div>'
-  calContent.innerHTML = html
+  container.innerHTML = html
 
-  // Tag-Klick → Tagesansicht
-  calContent.querySelectorAll('.cal-day-cell:not(.other-month)').forEach(cell => {
+  container.querySelectorAll('.cal-day-cell:not(.other-month)').forEach(cell => {
     cell.addEventListener('click', e => {
       if (e.target.classList.contains('cal-event-chip')) return
+      e.stopPropagation()
       _calDate = new Date(cell.dataset.date + 'T12:00:00')
       _calView = 'day'
       document.querySelectorAll('.cal-view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === 'day'))
-      renderCalendarView()
+      if (isFull) renderFullCalendar()
+      else { renderCalendarView(); openFullCalendar() }
     })
   })
 
-  // Termin-Chip-Klick → Bearbeitungsformular
-  calContent.querySelectorAll('.cal-event-chip').forEach(chip => {
+  container.querySelectorAll('.cal-event-chip').forEach(chip => {
     chip.addEventListener('click', e => {
       e.stopPropagation()
       const entry = _calendarEntries.find(en => String(en.id) === chip.dataset.id)
@@ -705,7 +773,7 @@ function renderMonthView () {
 
 // ── Week view ─────────────────────────────────────────────
 
-function renderWeekView () {
+function renderWeekView (container, titleEl, isFull) {
   const dow    = (_calDate.getDay() + 6) % 7
   const monday = new Date(_calDate)
   monday.setDate(_calDate.getDate() - dow)
@@ -716,7 +784,7 @@ function renderWeekView () {
 
   const startStr = dates[0].toLocaleDateString('de-DE', { day: 'numeric', month: 'long' })
   const endStr   = dates[6].toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })
-  calPeriodTitle.textContent = `${startStr} – ${endStr}`
+  titleEl.textContent = `${startStr} – ${endStr}`
 
   const dayNames = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
   const todayStr = isoDate(new Date())
@@ -740,37 +808,40 @@ function renderWeekView () {
     </div>`
   })
   html += '</div>'
-  calContent.innerHTML = html
+  container.innerHTML = html
 
-  calContent.querySelectorAll('.cal-week-event').forEach(el => {
-    el.addEventListener('click', () => {
-      const entry = _calendarEntries.find(e => String(e.id) === el.dataset.id)
+  container.querySelectorAll('.cal-week-event').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation()
+      const entry = _calendarEntries.find(en => String(en.id) === el.dataset.id)
       if (entry) showCalendarForm(entry)
     })
   })
 
-  calContent.querySelectorAll('.cal-week-day-header').forEach(hdr => {
-    hdr.addEventListener('click', () => {
+  container.querySelectorAll('.cal-week-day-header').forEach(hdr => {
+    hdr.addEventListener('click', e => {
+      e.stopPropagation()
       _calDate = new Date(hdr.closest('.cal-week-col').dataset.date + 'T12:00:00')
       _calView = 'day'
       document.querySelectorAll('.cal-view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === 'day'))
-      renderCalendarView()
+      if (isFull) renderFullCalendar()
+      else { renderCalendarView(); openFullCalendar() }
     })
   })
 }
 
 // ── Day view ──────────────────────────────────────────────
 
-function renderDayView () {
+function renderDayView (container, titleEl, isFull) {
   const dateStr = isoDate(_calDate)
   const events  = eventsForDate(dateStr)
 
-  calPeriodTitle.textContent = _calDate.toLocaleDateString('de-DE', {
+  titleEl.textContent = _calDate.toLocaleDateString('de-DE', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
   })
 
   if (!events.length) {
-    calContent.innerHTML = '<p class="cal-empty">Keine Termine für diesen Tag.<br>Tippen Sie auf „+ Hinzufügen".</p>'
+    container.innerHTML = '<p class="cal-empty">Keine Termine für diesen Tag.<br>Tippen Sie auf „+ Hinzufügen".</p>'
     return
   }
 
@@ -788,9 +859,9 @@ function renderDayView () {
     </div>`
   })
   html += '</div>'
-  calContent.innerHTML = html
+  container.innerHTML = html
 
-  calContent.querySelectorAll('.cal-entry-card').forEach(card => {
+  container.querySelectorAll('.cal-entry-card').forEach(card => {
     const entry = _calendarEntries.find(e => String(e.id) === card.dataset.id)
     if (!entry) return
     card.querySelector('.btn-edit').addEventListener('click', () => showCalendarForm(entry))
@@ -800,6 +871,7 @@ function renderDayView () {
         if (!ok) { showBanner('Termin konnte nicht gelöscht werden.', true); return }
         _calendarEntries = await loadCalendarFromDB()
         renderCalendarView()
+        if (!calFullOverlay.classList.contains('hidden')) renderFullCalendar()
       })
     })
   })
