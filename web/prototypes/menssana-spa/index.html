@@ -53,8 +53,8 @@
       </div>
       <div class="header-right">
         <span class="header-user" id="header-user"></span>
-        <button class="btn-icon" id="new-conv-btn" title="Neues Gespräch">
-          + Neu
+        <button class="btn-icon" id="new-conv-btn" title="Gespräch">
+          +Gespräch
         </button>
         <button class="btn-icon" id="meds-btn">Medikamente</button>
         <button class="btn-icon" id="cal-btn">Kalender</button>
@@ -114,8 +114,9 @@
               <button class="cal-view-tab" data-view="week">Woche</button>
               <button class="cal-view-tab" data-view="day">Tag</button>
             </div>
+            <button class="cal-nav-btn" id="cal-expand-btn" title="Kalender vergrößern">⤢</button>
           </div>
-          <div id="cal-compact" title="Zum Vergrößern klicken"></div>
+          <div id="cal-compact"></div>
           <div id="cal-entries-list"></div>
         </div>
       </div>
@@ -228,7 +229,7 @@
 
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=34"></script>
+  <script src="app.js?v=40"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')

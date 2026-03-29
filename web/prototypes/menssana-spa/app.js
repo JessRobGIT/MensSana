@@ -376,6 +376,10 @@ async function createNewConversation () {
 }
 
 newConvBtn.addEventListener('click', () => {
+  if (_activeSection !== 'chat') {
+    showChatView()
+    return
+  }
   showConfirm(
     'Möchten Sie ein neues Gespräch beginnen? Das aktuelle Gespräch bleibt gespeichert.',
     'Ja, neu starten',
@@ -425,7 +429,10 @@ function appendMessage (role, content) {
 
 // ── Medications ───────────────────────────────────────────
 
+let _activeSection = 'chat'
+
 function showSection (name) {
+  _activeSection = name
   chatSection.classList.toggle('hidden', name !== 'chat')
   medsSection.classList.toggle('hidden', name !== 'meds')
   calSection.classList.toggle('hidden', name !== 'calendar')
@@ -665,6 +672,8 @@ calCompact.addEventListener('click', e => {
   openFullCalendar()
 })
 
+document.getElementById('cal-expand-btn').addEventListener('click', openFullCalendar)
+
 function openFullCalendar () {
   calFullOverlay.classList.remove('hidden')
   renderFullCalendar()
@@ -745,7 +754,10 @@ function renderMonthView (container, titleEl, isFull) {
     const isToday = dateStr === todayStr
     html += `<div class="cal-day-cell${isToday ? ' today' : ''}" data-date="${dateStr}">
       <span class="cal-day-num">${d}</span>
-      <div class="cal-day-events">${events.map(e => `<span class="cal-event-chip${e.allDay ? ' allday' : ''}" data-id="${e.id}">${escapeHtml(e.title)}</span>`).join('')}</div>
+      <div class="cal-day-events">${
+        events.slice(0, 4).map(e => `<span class="cal-event-chip${e.allDay ? ' allday' : ''}" data-id="${e.id}">${escapeHtml(e.title)}</span>`).join('') +
+        (events.length > 4 ? `<span class="cal-more-chips">+${events.length - 4}</span>` : '')
+      }</div>
     </div>`
   }
 
@@ -759,8 +771,6 @@ function renderMonthView (container, titleEl, isFull) {
       if (e.target.classList.contains('cal-event-chip')) return
       e.stopPropagation()
       _calDate = new Date(cell.dataset.date + 'T12:00:00')
-      _calView = 'day'
-      document.querySelectorAll('.cal-view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === 'day'))
       if (isFull) renderFullCalendar()
       else { renderCalendarView(); openFullCalendar() }
     })
@@ -795,20 +805,42 @@ function renderWeekView (container, titleEl, isFull) {
 
   let html = '<div class="cal-week-grid">'
   dates.forEach((d, i) => {
-    const dateStr = isoDate(d)
-    const events  = eventsForDate(dateStr)
-    const isToday = dateStr === todayStr
+    const dateStr   = isoDate(d)
+    const events    = eventsForDate(dateStr)
+    const isToday   = dateStr === todayStr
+    const allDay    = events.filter(e => e.allDay)
+    const timed     = events.filter(e => !e.allDay)
+    const hasAllDay = allDay.length > 0
+    const hasTimed  = timed.length > 0
+
+    const allDayHtml = hasAllDay
+      ? `<div class="cal-week-allday-col">` +
+        allDay.map(e =>
+          `<div class="cal-week-event allday" data-id="${e.id}">` +
+          `<span class="cal-week-event-time">Ganztg.</span>` +
+          `<span class="cal-week-event-title">${escapeHtml(e.title)}</span>` +
+          `</div>`
+        ).join('') +
+        `</div>`
+      : ''
+
+    const timedHtml = hasTimed
+      ? `<div class="cal-week-timed-col">` +
+        timed.map(e =>
+          `<div class="cal-week-event" data-id="${e.id}">` +
+          `<span class="cal-week-event-time">${e.time}</span>` +
+          `<span class="cal-week-event-title">${escapeHtml(e.title)}</span>` +
+          `</div>`
+        ).join('') +
+        `</div>`
+      : ''
+
     html += `<div class="cal-week-col${isToday ? ' today' : ''}" data-date="${dateStr}">
       <div class="cal-week-day-header">
         <span class="cal-week-day-name">${dayNames[i]}</span>
         <span class="cal-week-day-num">${d.getDate()}</span>
       </div>
-      <div class="cal-week-events">
-        ${events.map(e => `<div class="cal-week-event${e.allDay ? ' allday' : ''}" data-id="${e.id}">
-          <span class="cal-week-event-time">${e.allDay ? 'Ganztg.' : e.time}</span>
-          <span class="cal-week-event-title">${escapeHtml(e.title)}</span>
-        </div>`).join('')}
-      </div>
+      <div class="cal-week-events${hasAllDay && hasTimed ? ' has-both' : ''}">${allDayHtml}${timedHtml}</div>
     </div>`
   })
   html += '</div>'
@@ -826,8 +858,6 @@ function renderWeekView (container, titleEl, isFull) {
     hdr.addEventListener('click', e => {
       e.stopPropagation()
       _calDate = new Date(hdr.closest('.cal-week-col').dataset.date + 'T12:00:00')
-      _calView = 'day'
-      document.querySelectorAll('.cal-view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === 'day'))
       if (isFull) renderFullCalendar()
       else { renderCalendarView(); openFullCalendar() }
     })

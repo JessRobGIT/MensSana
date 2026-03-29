@@ -821,19 +821,6 @@ html, body {
 
 #cal-compact:hover { opacity: 0.88; }
 
-#cal-compact::after {
-  content: '⤢';
-  position: absolute;
-  bottom: 6px;
-  right: 8px;
-  font-size: 1rem;
-  color: var(--green);
-  background: var(--green-pale);
-  border-radius: 4px;
-  padding: 1px 7px;
-  pointer-events: none;
-  line-height: 1.6;
-}
 
 /* Smaller cells in compact mode */
 #cal-compact .cal-day-cell    { min-height: 50px; }
@@ -1059,6 +1046,14 @@ html, body {
 .cal-event-chip:hover { background: #245a42; }
 .cal-event-chip.allday:hover { background: #145e6e; }
 
+.cal-more-chips {
+  font-size: 0.68rem;
+  color: var(--muted);
+  padding: 2px 4px;
+  white-space: nowrap;
+  align-self: center;
+}
+
 /* Week view */
 .cal-week-grid {
   display: grid;
@@ -1106,10 +1101,37 @@ html, body {
 .cal-week-events {
   flex: 1;
   padding: 4px;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Side-by-side when both all-day and timed events exist */
+.cal-week-events.has-both {
+  display: block;
+  overflow: hidden;
+}
+
+.cal-week-events.has-both::after {
+  content: '';
+  display: block;
+  clear: both;
+}
+
+.cal-week-allday-col {
+  float: left;
+  width: 50%;
+  box-sizing: border-box;
+  padding-right: 1px;
+}
+
+.cal-week-timed-col {
+  float: left;
+  width: 50%;
+  box-sizing: border-box;
+  padding-left: 1px;
 }
 
 .cal-week-event {
