@@ -41,7 +41,10 @@ const calBtn         = document.getElementById('cal-btn')
 const calSection     = document.getElementById('calendar-section')
 const calBack        = document.getElementById('calendar-back')
 const calAddBtn      = document.getElementById('calendar-add-btn')
-const calList        = document.getElementById('cal-list')
+const calContent     = document.getElementById('cal-content')
+const calPeriodTitle = document.getElementById('cal-period-title')
+const calPrevBtn     = document.getElementById('cal-prev')
+const calNextBtn     = document.getElementById('cal-next')
 const calFormOverlay    = document.getElementById('cal-form-overlay')
 const calFormTitle      = document.getElementById('cal-form-title')
 const calFormSave       = document.getElementById('cal-form-save')
@@ -429,7 +432,7 @@ function showMedsView () {
 
 function showCalendarView () {
   showSection('calendar')
-  loadCalendarFromDB().then(entries => { _calendarEntries = entries; renderCalendar() })
+  loadCalendarFromDB().then(entries => { _calendarEntries = entries; renderCalendarView() })
 }
 
 medsBtn.addEventListener('click', showMedsView)
@@ -437,7 +440,7 @@ medsBack.addEventListener('click', showChatView)
 medsAddBtn.addEventListener('click', () => showMedForm(null))
 calBtn.addEventListener('click', showCalendarView)
 calBack.addEventListener('click', showChatView)
-calAddBtn.addEventListener('click', () => showCalendarForm(null))
+calAddBtn.addEventListener('click', () => showCalendarForm(null, _calView === 'day' ? isoDate(_calDate) : null))
 
 async function loadMedicationsFromDB () {
   const { data, error } = await sb
@@ -604,6 +607,205 @@ async function updateMedicationActiveInDB (id, active) {
 
 let _calendarEntries = []
 let _editingCalId    = null
+let _calView         = 'month'
+let _calDate         = new Date()
+
+const freqLabel = { once: '', daily: 'Täglich', weekly: 'Wöchentlich', monthly: 'Monatlich', yearly: 'Jährlich' }
+
+function isoDate (d) { return d.toISOString().slice(0, 10) }
+
+function eventsForDate (dateStr) {
+  return _calendarEntries.filter(e => e.date === dateStr)
+}
+
+// Navigation
+calPrevBtn.addEventListener('click', () => calNavigate(-1))
+calNextBtn.addEventListener('click', () => calNavigate(1))
+
+document.querySelectorAll('.cal-view-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    _calView = tab.dataset.view
+    document.querySelectorAll('.cal-view-tab').forEach(t => t.classList.remove('active'))
+    tab.classList.add('active')
+    renderCalendarView()
+  })
+})
+
+function calNavigate (dir) {
+  if (_calView === 'month') {
+    _calDate = new Date(_calDate.getFullYear(), _calDate.getMonth() + dir, 1)
+  } else if (_calView === 'week') {
+    _calDate = new Date(_calDate.getTime() + dir * 7 * 86400000)
+  } else {
+    _calDate = new Date(_calDate.getTime() + dir * 86400000)
+  }
+  renderCalendarView()
+}
+
+function renderCalendarView () {
+  if (_calView === 'month')     renderMonthView()
+  else if (_calView === 'week') renderWeekView()
+  else                          renderDayView()
+}
+
+// ── Month view ────────────────────────────────────────────
+
+function renderMonthView () {
+  const year     = _calDate.getFullYear()
+  const month    = _calDate.getMonth()
+  const todayStr = isoDate(new Date())
+
+  calPeriodTitle.textContent = _calDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+
+  const firstDay = new Date(year, month, 1)
+  const lastDay  = new Date(year, month + 1, 0)
+  const startDow = (firstDay.getDay() + 6) % 7  // 0 = Montag
+
+  const dayNames = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+  let html = '<div class="cal-month-grid">'
+  dayNames.forEach(n => { html += `<div class="cal-month-header">${n}</div>` })
+
+  for (let i = 0; i < startDow; i++) html += '<div class="cal-day-cell other-month"></div>'
+
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const dateStr = isoDate(new Date(year, month, d))
+    const events  = eventsForDate(dateStr)
+    const isToday = dateStr === todayStr
+    html += `<div class="cal-day-cell${isToday ? ' today' : ''}" data-date="${dateStr}">
+      <span class="cal-day-num">${d}</span>
+      ${events.map(e => `<span class="cal-event-chip" data-id="${e.id}">${escapeHtml(e.title)}</span>`).join('')}
+    </div>`
+  }
+
+  const remainder = (startDow + lastDay.getDate()) % 7
+  if (remainder) for (let i = remainder; i < 7; i++) html += '<div class="cal-day-cell other-month"></div>'
+  html += '</div>'
+  calContent.innerHTML = html
+
+  // Tag-Klick → Tagesansicht
+  calContent.querySelectorAll('.cal-day-cell:not(.other-month)').forEach(cell => {
+    cell.addEventListener('click', e => {
+      if (e.target.classList.contains('cal-event-chip')) return
+      _calDate = new Date(cell.dataset.date + 'T12:00:00')
+      _calView = 'day'
+      document.querySelectorAll('.cal-view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === 'day'))
+      renderCalendarView()
+    })
+  })
+
+  // Termin-Chip-Klick → Bearbeitungsformular
+  calContent.querySelectorAll('.cal-event-chip').forEach(chip => {
+    chip.addEventListener('click', e => {
+      e.stopPropagation()
+      const entry = _calendarEntries.find(en => String(en.id) === chip.dataset.id)
+      if (entry) showCalendarForm(entry)
+    })
+  })
+}
+
+// ── Week view ─────────────────────────────────────────────
+
+function renderWeekView () {
+  const dow    = (_calDate.getDay() + 6) % 7
+  const monday = new Date(_calDate)
+  monday.setDate(_calDate.getDate() - dow)
+
+  const dates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday); d.setDate(monday.getDate() + i); return d
+  })
+
+  const startStr = dates[0].toLocaleDateString('de-DE', { day: 'numeric', month: 'long' })
+  const endStr   = dates[6].toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })
+  calPeriodTitle.textContent = `${startStr} – ${endStr}`
+
+  const dayNames = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+  const todayStr = isoDate(new Date())
+
+  let html = '<div class="cal-week-grid">'
+  dates.forEach((d, i) => {
+    const dateStr = isoDate(d)
+    const events  = eventsForDate(dateStr)
+    const isToday = dateStr === todayStr
+    html += `<div class="cal-week-col${isToday ? ' today' : ''}" data-date="${dateStr}">
+      <div class="cal-week-day-header">
+        <span class="cal-week-day-name">${dayNames[i]}</span>
+        <span class="cal-week-day-num">${d.getDate()}</span>
+      </div>
+      <div class="cal-week-events">
+        ${events.map(e => `<div class="cal-week-event" data-id="${e.id}">
+          <span class="cal-week-event-time">${e.allDay ? 'Ganztg.' : e.time}</span>
+          <span class="cal-week-event-title">${escapeHtml(e.title)}</span>
+        </div>`).join('')}
+      </div>
+    </div>`
+  })
+  html += '</div>'
+  calContent.innerHTML = html
+
+  calContent.querySelectorAll('.cal-week-event').forEach(el => {
+    el.addEventListener('click', () => {
+      const entry = _calendarEntries.find(e => String(e.id) === el.dataset.id)
+      if (entry) showCalendarForm(entry)
+    })
+  })
+
+  calContent.querySelectorAll('.cal-week-day-header').forEach(hdr => {
+    hdr.addEventListener('click', () => {
+      _calDate = new Date(hdr.closest('.cal-week-col').dataset.date + 'T12:00:00')
+      _calView = 'day'
+      document.querySelectorAll('.cal-view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === 'day'))
+      renderCalendarView()
+    })
+  })
+}
+
+// ── Day view ──────────────────────────────────────────────
+
+function renderDayView () {
+  const dateStr = isoDate(_calDate)
+  const events  = eventsForDate(dateStr)
+
+  calPeriodTitle.textContent = _calDate.toLocaleDateString('de-DE', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  })
+
+  if (!events.length) {
+    calContent.innerHTML = '<p class="cal-empty">Keine Termine für diesen Tag.<br>Tippen Sie auf „+ Hinzufügen".</p>'
+    return
+  }
+
+  let html = '<div class="cal-day-list">'
+  events.forEach(entry => {
+    const badge = entry.frequency && entry.frequency !== 'once' ? ` · ${freqLabel[entry.frequency]}` : ''
+    html += `<div class="cal-entry-card" data-id="${entry.id}">
+      <span class="cal-entry-date">${entry.allDay ? 'Ganztägig' : entry.time + ' Uhr'}${badge}</span>
+      <span class="cal-entry-title">${escapeHtml(entry.title)}</span>
+      ${entry.notes ? `<span class="cal-entry-notes">${escapeHtml(entry.notes)}</span>` : ''}
+      <div class="cal-entry-actions">
+        <button class="btn-edit">Bearbeiten</button>
+        <button class="btn-delete">Löschen</button>
+      </div>
+    </div>`
+  })
+  html += '</div>'
+  calContent.innerHTML = html
+
+  calContent.querySelectorAll('.cal-entry-card').forEach(card => {
+    const entry = _calendarEntries.find(e => String(e.id) === card.dataset.id)
+    if (!entry) return
+    card.querySelector('.btn-edit').addEventListener('click', () => showCalendarForm(entry))
+    card.querySelector('.btn-delete').addEventListener('click', () => {
+      showConfirm(`„${entry.title}" wirklich löschen?`, 'Ja, löschen', async () => {
+        const ok = await deleteCalendarEntryFromDB(entry.id)
+        if (!ok) { showBanner('Termin konnte nicht gelöscht werden.', true); return }
+        _calendarEntries = await loadCalendarFromDB()
+        renderCalendarView()
+      })
+    })
+  })
+}
+
+// ── DB / Form ─────────────────────────────────────────────
 
 async function loadCalendarFromDB () {
   const { data, error } = await sb
@@ -613,19 +815,18 @@ async function loadCalendarFromDB () {
     .order('starts_at', { ascending: true })
 
   if (error) {
-    calList.innerHTML = '<p class="cal-empty" style="color:var(--danger)">Termine konnten nicht geladen werden.</p>'
+    calContent.innerHTML = '<p class="cal-empty" style="color:var(--danger)">Termine konnten nicht geladen werden.</p>'
     return []
   }
 
   return (data ?? []).map(entry => {
-    const start   = new Date(entry.starts_at)
-    const isoDate = start.toISOString().slice(0, 10)
-    const hh      = String(start.getHours()).padStart(2, '0')
-    const mm      = String(start.getMinutes()).padStart(2, '0')
+    const start = new Date(entry.starts_at)
+    const hh    = String(start.getHours()).padStart(2, '0')
+    const mm    = String(start.getMinutes()).padStart(2, '0')
     return {
       id:         entry.id,
       title:      entry.title,
-      date:       isoDate,
+      date:       isoDate(start),
       time:       `${hh}:${mm}`,
       notes:      entry.description ?? '',
       allDay:     entry.all_day ?? false,
@@ -637,70 +838,20 @@ async function loadCalendarFromDB () {
   })
 }
 
-const freqLabel = { once: '', daily: 'Täglich', weekly: 'Wöchentlich', monthly: 'Monatlich', yearly: 'Jährlich' }
-
-function formatCalDate (dateStr, timeStr, allDay) {
-  const d   = new Date(dateStr + 'T12:00:00')
-  const day = d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-  return allDay ? day : `${day}, ${timeStr} Uhr`
-}
-
-function renderCalendar () {
-  if (!_calendarEntries.length) {
-    calList.innerHTML = '<p class="cal-empty">Noch keine Termine eingetragen.<br>Tippen Sie auf „+ Hinzufügen".</p>'
-    return
-  }
-
-  calList.innerHTML = ''
-  _calendarEntries.forEach(entry => {
-    const recurringBadge = entry.frequency && entry.frequency !== 'once'
-      ? ` · ${freqLabel[entry.frequency] ?? entry.frequency}`
-      : ''
-    const card = document.createElement('div')
-    card.className = 'cal-entry-card'
-    card.innerHTML = `
-      <span class="cal-entry-date">${formatCalDate(entry.date, entry.time, entry.allDay)}${recurringBadge}</span>
-      <span class="cal-entry-title">${escapeHtml(entry.title)}</span>
-      ${entry.notes ? `<span class="cal-entry-notes">${escapeHtml(entry.notes)}</span>` : ''}
-      <div class="cal-entry-actions">
-        <button class="btn-edit">Bearbeiten</button>
-        <button class="btn-delete">Löschen</button>
-      </div>
-    `
-
-    card.querySelector('.btn-edit').addEventListener('click', () => showCalendarForm(entry))
-
-    card.querySelector('.btn-delete').addEventListener('click', () => {
-      showConfirm(
-        `„${entry.title}" wirklich löschen?`,
-        'Ja, löschen',
-        async () => {
-          const ok = await deleteCalendarEntryFromDB(entry.id)
-          if (!ok) { showBanner('Termin konnte nicht gelöscht werden.', true); return }
-          _calendarEntries = await loadCalendarFromDB()
-          renderCalendar()
-        }
-      )
-    })
-
-    calList.appendChild(card)
-  })
-}
-
 calAlldayInput.addEventListener('change', () => {
-  calTimeGroup.style.display = calAlldayInput.checked ? 'none' : ''
+  calTimeGroup.style.visibility = calAlldayInput.checked ? 'hidden' : 'visible'
 })
 
-function showCalendarForm (entry) {
-  _editingCalId                = entry?.id ?? null
-  calFormTitle.textContent     = entry ? 'Termin bearbeiten' : 'Termin hinzufügen'
-  calTitleInput.value          = entry?.title     ?? ''
-  calDateInput.value           = entry?.date      ?? new Date().toISOString().slice(0, 10)
-  calAlldayInput.checked       = entry?.allDay    ?? false
-  calTimeGroup.style.display   = (entry?.allDay)  ? 'none' : ''
-  calTimeInput.value           = entry?.time      ?? '09:00'
-  calRecurringInput.value      = entry?.frequency ?? 'once'
-  calNotesInput.value          = entry?.notes     ?? ''
+function showCalendarForm (entry, defaultDate = null) {
+  _editingCalId              = entry?.id ?? null
+  calFormTitle.textContent   = entry ? 'Termin bearbeiten' : 'Termin hinzufügen'
+  calTitleInput.value        = entry?.title     ?? ''
+  calDateInput.value         = entry?.date      ?? defaultDate ?? isoDate(new Date())
+  calAlldayInput.checked     = entry?.allDay    ?? false
+  calTimeGroup.style.visibility = (entry?.allDay) ? 'hidden' : 'visible'
+  calTimeInput.value         = entry?.time      ?? '09:00'
+  calRecurringInput.value    = entry?.frequency ?? 'once'
+  calNotesInput.value        = entry?.notes     ?? ''
   calFormOverlay.classList.remove('hidden')
   calTitleInput.focus()
 }
@@ -731,7 +882,7 @@ calFormSave.addEventListener('click', async () => {
 
   hideCalendarForm()
   _calendarEntries = await loadCalendarFromDB()
-  renderCalendar()
+  renderCalendarView()
 })
 
 async function saveCalendarEntryToDB (entry) {

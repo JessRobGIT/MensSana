@@ -105,7 +105,17 @@
             <h2>Meine Termine</h2>
             <button class="btn-icon" id="calendar-add-btn">+ Hinzufügen</button>
           </div>
-          <div id="cal-list"></div>
+          <div class="cal-nav">
+            <button class="cal-nav-btn" id="cal-prev">&#8249;</button>
+            <span id="cal-period-title"></span>
+            <button class="cal-nav-btn" id="cal-next">&#8250;</button>
+            <div class="cal-view-tabs">
+              <button class="cal-view-tab active" data-view="month">Monat</button>
+              <button class="cal-view-tab" data-view="week">Woche</button>
+              <button class="cal-view-tab" data-view="day">Tag</button>
+            </div>
+          </div>
+          <div id="cal-content"></div>
         </div>
       </div>
 
@@ -203,7 +213,7 @@
 
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=29"></script>
+  <script src="app.js?v=31"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')
