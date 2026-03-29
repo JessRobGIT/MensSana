@@ -11,8 +11,27 @@ interface Message {
   content: string
 }
 
+const VALID_MOODS = new Set(['positive', 'neutral', 'subdued', 'concerned'])
+
+function extractParsed(text: string): { reply: string; mood: string } | null {
+  // Strip optional markdown code fences
+  const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+  try {
+    const obj = JSON.parse(cleaned)
+    if (typeof obj.reply === 'string') return obj
+  } catch { /* fall through */ }
+  // Try to find a JSON object anywhere in the text
+  const match = text.match(/\{[\s\S]*?"reply"\s*:[\s\S]*?\}/)
+  if (match) {
+    try {
+      const obj = JSON.parse(match[0])
+      if (typeof obj.reply === 'string') return obj
+    } catch { /* fall through */ }
+  }
+  return null
+}
+
 Deno.serve(async (req) => {
-  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS })
   }
@@ -42,8 +61,17 @@ Deno.serve(async (req) => {
 Du hilfst bei Gesprächen, Orientierung im Alltag und emotionaler Unterstützung.
 Antworte immer auf Deutsch, in kurzen, klaren Sätzen.
 Sei warm, geduldig und verständnisvoll. Vermeide technische Fachbegriffe.
-Wenn du nach Terminen, Medikamenten oder der Uhrzeit gefragt wirst, erkläre freundlich, dass du dafür noch mehr Informationen brauchst.`,
-        messages: messages,
+Wenn du nach Terminen, Medikamenten oder der Uhrzeit gefragt wirst, erkläre freundlich, dass du dafür noch mehr Informationen brauchst.
+
+Antworte IMMER ausschließlich als JSON-Objekt in diesem exakten Format (kein Markdown, kein weiterer Text):
+{"reply":"<deine deutsche Antwort>","mood":"<eine von: positive, neutral, subdued, concerned>"}
+
+Wähle die Stimmung anhand der letzten User-Nachricht:
+- positive: fröhlich, dankbar, energetisch, optimistisch
+- neutral: ruhig, sachlich, informierend, alltäglich
+- subdued: müde, zurückgezogen, wenig Energie, still
+- concerned: besorgt, traurig, ängstlich, verwirrt, klagend`,
+        messages,
       }),
     })
 
@@ -57,17 +85,22 @@ Wenn du nach Terminen, Medikamenten oder der Uhrzeit gefragt wirst, erkläre fre
     }
 
     const result = await response.json()
-    const content = result.content?.[0]?.text ?? ''
+    const raw    = result.content?.[0]?.text ?? ''
+
+    const parsed = extractParsed(raw)
+    const content = parsed?.reply || raw
+    const mood    = (parsed?.mood && VALID_MOODS.has(parsed.mood)) ? parsed.mood : 'neutral'
 
     return new Response(
-      JSON.stringify({ content }),
+      JSON.stringify({ content, mood }),
       { headers: { ...CORS, 'Content-Type': 'application/json' } }
     )
 
   } catch (err) {
-    console.error('Function error:', err)
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('Function error:', msg)
     return new Response(
-      JSON.stringify({ error: 'Internal error' }),
+      JSON.stringify({ error: 'Internal error', detail: msg }),
       { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } }
     )
   }

@@ -1044,6 +1044,20 @@ async function deleteCalendarEntryFromDB (id) {
   return !error
 }
 
+// ── Mood ──────────────────────────────────────────────────
+
+const MOOD_MAP = { positive: '4', neutral: '3', subdued: '2', concerned: '1' }
+
+async function saveMoodToDB (label) {
+  if (!currentUser) return
+  const level = MOOD_MAP[label] ?? '3'
+  const today = isoDate(new Date())
+  await sb.from('mood_entries').upsert(
+    { user_id: currentUser.id, mood: level, entry_date: today, recorded_at: new Date().toISOString() },
+    { onConflict: 'user_id,entry_date' }
+  )
+}
+
 // ── Send ──────────────────────────────────────────────────
 async function sendMessage () {
   const text   = messageInput.value.trim()
@@ -1125,6 +1139,8 @@ async function sendMessage () {
         role:            'assistant',
         content:         reply,
       })
+      // Save today's mood (upsert — one value per day)
+      if (fnJson.mood) saveMoodToDB(fnJson.mood)
     }
 
     // Update timestamp for the pinned conversation
