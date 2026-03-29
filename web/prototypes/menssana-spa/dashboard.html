@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#2d6a4f" />
+  <title>MensSana – Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body>
+
+  <!-- ── LOGIN ───────────────────────────────────────────── -->
+  <div id="login-view">
+    <div class="login-card">
+      <div class="login-logo">
+        <h1>MensSana</h1>
+        <p>Caregiver-Dashboard</p>
+      </div>
+      <form id="login-form" novalidate>
+        <div class="form-group">
+          <label for="email">E-Mail-Adresse</label>
+          <input type="email" id="email" autocomplete="email"
+                 placeholder="ihre@email.de" required />
+        </div>
+        <div class="form-group">
+          <label for="password">Passwort</label>
+          <input type="password" id="password" autocomplete="current-password"
+                 placeholder="••••••••" required />
+        </div>
+        <button type="submit" class="btn btn-primary" id="login-btn">Anmelden</button>
+        <p class="status-msg" id="login-status" role="alert"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── DASHBOARD ───────────────────────────────────────── -->
+  <div id="dashboard-view" class="hidden">
+
+    <header class="dash-header">
+      <h1>MensSana <span class="dash-label">Dashboard</span></h1>
+      <div class="dash-header-right">
+        <span id="dash-user"></span>
+        <a href="index.html" class="btn-link">Zur App</a>
+        <button class="btn-outline" id="logout-btn">Abmelden</button>
+      </div>
+    </header>
+
+    <main class="dash-main">
+
+      <!-- User list -->
+      <section id="users-section">
+        <h2 class="section-title">Betreute Personen</h2>
+        <div id="users-grid" class="users-grid"></div>
+        <p id="users-empty" class="empty-msg hidden">
+          Keine betreuten Personen zugewiesen. Bitte in Supabase eine Zuweisung anlegen.
+        </p>
+      </section>
+
+      <!-- Detail panel -->
+      <section id="detail-panel" class="hidden">
+        <div class="detail-header">
+          <button class="btn-back" id="detail-back">← Übersicht</button>
+          <h2 id="detail-name"></h2>
+        </div>
+
+        <div class="detail-grid">
+
+          <div class="detail-card">
+            <h3>Stimmung — letzte 7 Tage</h3>
+            <div id="mood-chart" class="mood-chart"></div>
+          </div>
+
+          <div class="detail-card">
+            <h3>Letzte Gespräche</h3>
+            <div id="conv-list" class="detail-list"></div>
+          </div>
+
+          <div class="detail-card">
+            <h3>Medikamente</h3>
+            <div id="meds-list" class="detail-list"></div>
+          </div>
+
+          <div class="detail-card">
+            <h3>Nächste Termine</h3>
+            <div id="events-list" class="detail-list"></div>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="supabase.min.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>
