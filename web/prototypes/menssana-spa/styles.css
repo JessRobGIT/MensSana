@@ -1034,21 +1034,30 @@ html, body {
   color: #fff;
 }
 
+.cal-day-events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
 .cal-event-chip {
-  display: block;
+  display: inline-block;
   background: var(--green);
   color: #fff;
   border-radius: 4px;
   padding: 2px 5px;
   font-size: 0.72rem;
-  margin-bottom: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
+  max-width: 100%;
 }
 
+.cal-event-chip.allday { background: #1b7a8a; }
+
 .cal-event-chip:hover { background: #245a42; }
+.cal-event-chip.allday:hover { background: #145e6e; }
 
 /* Week view */
 .cal-week-grid {
@@ -1112,7 +1121,9 @@ html, body {
   transition: background 0.15s;
 }
 
+.cal-week-event.allday { background: #1b7a8a; }
 .cal-week-event:hover { background: #245a42; }
+.cal-week-event.allday:hover { background: #145e6e; }
 
 .cal-week-event-time {
   display: block;

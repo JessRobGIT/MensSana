@@ -745,7 +745,7 @@ function renderMonthView (container, titleEl, isFull) {
     const isToday = dateStr === todayStr
     html += `<div class="cal-day-cell${isToday ? ' today' : ''}" data-date="${dateStr}">
       <span class="cal-day-num">${d}</span>
-      ${events.map(e => `<span class="cal-event-chip" data-id="${e.id}">${escapeHtml(e.title)}</span>`).join('')}
+      <div class="cal-day-events">${events.map(e => `<span class="cal-event-chip${e.allDay ? ' allday' : ''}" data-id="${e.id}">${escapeHtml(e.title)}</span>`).join('')}</div>
     </div>`
   }
 
@@ -804,7 +804,7 @@ function renderWeekView (container, titleEl, isFull) {
         <span class="cal-week-day-num">${d.getDate()}</span>
       </div>
       <div class="cal-week-events">
-        ${events.map(e => `<div class="cal-week-event" data-id="${e.id}">
+        ${events.map(e => `<div class="cal-week-event${e.allDay ? ' allday' : ''}" data-id="${e.id}">
           <span class="cal-week-event-time">${e.allDay ? 'Ganztg.' : e.time}</span>
           <span class="cal-week-event-title">${escapeHtml(e.title)}</span>
         </div>`).join('')}
@@ -991,10 +991,20 @@ async function saveCalendarEntryToDB (entry) {
   }
 
   if (entry.id) {
-    const { error } = await sb.from('calendar_events').update(payload).eq('id', entry.id).eq('user_id', currentUser.id)
+    let { error } = await sb.from('calendar_events').update(payload).eq('id', entry.id).eq('user_id', currentUser.id)
+    if (error) {
+      // Retry without frequency in case column is missing
+      const { frequency: _f, ...payloadNoFreq } = payload
+      ;({ error } = await sb.from('calendar_events').update(payloadNoFreq).eq('id', entry.id).eq('user_id', currentUser.id))
+    }
     return !error
   } else {
-    const { error } = await sb.from('calendar_events').insert([payload])
+    let { error } = await sb.from('calendar_events').insert([payload])
+    if (error) {
+      // Retry without frequency in case column is missing
+      const { frequency: _f, ...payloadNoFreq } = payload
+      ;({ error } = await sb.from('calendar_events').insert([payloadNoFreq]))
+    }
     return !error
   }
 }
