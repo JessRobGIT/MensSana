@@ -56,6 +56,7 @@ const calFormOverlay    = document.getElementById('cal-form-overlay')
 const calFormTitle      = document.getElementById('cal-form-title')
 const calFormSave       = document.getElementById('cal-form-save')
 const calFormCancel     = document.getElementById('cal-form-cancel')
+const calFormDelete     = document.getElementById('cal-form-delete')
 const calTitleInput     = document.getElementById('cal-title')
 const calDateInput      = document.getElementById('cal-date')
 const calAlldayInput    = document.getElementById('cal-allday')
@@ -619,7 +620,10 @@ let _calDate         = new Date()
 
 const freqLabel = { once: '', daily: 'Täglich', weekly: 'Wöchentlich', monthly: 'Monatlich', yearly: 'Jährlich' }
 
-function isoDate (d) { return d.toISOString().slice(0, 10) }
+function isoDate (d) {
+  // Use LOCAL date (not UTC) so calendar cells and event dates always match
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
 function eventsForDate (dateStr) { return _calendarEntries.filter(e => e.date === dateStr) }
 
 // ── Navigation ────────────────────────────────────────────
@@ -924,6 +928,7 @@ function showCalendarForm (entry, defaultDate = null) {
   calTimeInput.value         = entry?.time      ?? '09:00'
   calRecurringInput.value    = entry?.frequency ?? 'once'
   calNotesInput.value        = entry?.notes     ?? ''
+  calFormDelete.style.display = _editingCalId ? '' : 'none'
   calFormOverlay.classList.remove('hidden')
   calTitleInput.focus()
 }
@@ -934,6 +939,20 @@ function hideCalendarForm () {
 }
 
 calFormCancel.addEventListener('click', hideCalendarForm)
+
+calFormDelete.addEventListener('click', () => {
+  if (!_editingCalId) return
+  const id    = _editingCalId
+  const title = calTitleInput.value
+  hideCalendarForm()
+  showConfirm(`„${title}" wirklich löschen?`, 'Ja, löschen', async () => {
+    const ok = await deleteCalendarEntryFromDB(id)
+    if (!ok) { showBanner('Termin konnte nicht gelöscht werden.', true); return }
+    _calendarEntries = await loadCalendarFromDB()
+    renderCalendarView()
+    if (!calFullOverlay.classList.contains('hidden')) renderFullCalendar()
+  })
+})
 
 calFormSave.addEventListener('click', async () => {
   const title = calTitleInput.value.trim()
@@ -958,7 +977,8 @@ calFormSave.addEventListener('click', async () => {
 })
 
 async function saveCalendarEntryToDB (entry) {
-  const startsAt = `${entry.date}T${entry.time}:00`
+  // All-day: use noon UTC to avoid timezone date-shift across any timezone
+  const startsAt = entry.allDay ? `${entry.date}T12:00:00Z` : `${entry.date}T${entry.time}:00`
   const payload  = {
     user_id:     currentUser.id,
     title:       entry.title,

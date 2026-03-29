@@ -133,6 +133,13 @@ html, body {
 
 .btn-secondary:hover:not(:disabled) { background: var(--green-pale); }
 
+.btn-danger {
+  background: #fdecea;
+  color: var(--danger);
+  border: 2px solid var(--danger);
+}
+.btn-danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
+
 .status-msg {
   margin-top: 16px;
   text-align: center;

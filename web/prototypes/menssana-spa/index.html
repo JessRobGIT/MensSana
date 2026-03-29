@@ -208,6 +208,7 @@
       <div class="med-form-actions">
         <button class="btn btn-primary" id="cal-form-save">Speichern</button>
         <button class="btn btn-secondary" id="cal-form-cancel">Abbrechen</button>
+        <button class="btn btn-danger" id="cal-form-delete" style="display:none">Löschen</button>
       </div>
     </div>
   </div>
@@ -227,7 +228,7 @@
 
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=32"></script>
+  <script src="app.js?v=33"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')
