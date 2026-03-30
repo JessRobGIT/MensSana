@@ -95,6 +95,24 @@ body {
 
 .dash-header-right { display: flex; align-items: center; gap: 12px; font-size: 0.85rem; }
 
+.dash-role-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 12px;
+  letter-spacing: 0.02em;
+}
+
+.dash-role-badge.role-caregiver {
+  background: rgba(255,255,255,0.25);
+  color: #fff;
+}
+
+.dash-role-badge.role-family {
+  background: rgba(255,220,100,0.35);
+  color: #fff;
+}
+
 .btn-link { color: rgba(255,255,255,0.8); text-decoration: none; font-size: 0.85rem; }
 .btn-link:hover { color: #fff; }
 

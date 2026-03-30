@@ -13,8 +13,9 @@ const loginView    = document.getElementById('login-view')
 const dashView     = document.getElementById('dashboard-view')
 const loginForm    = document.getElementById('login-form')
 const loginStatus  = document.getElementById('login-status')
-const dashUser     = document.getElementById('dash-user')
-const logoutBtn    = document.getElementById('logout-btn')
+const dashUser      = document.getElementById('dash-user')
+const dashRoleBadge = document.getElementById('dash-role-badge')
+const logoutBtn     = document.getElementById('logout-btn')
 const usersSection = document.getElementById('users-section')
 const usersGrid    = document.getElementById('users-grid')
 const usersEmpty   = document.getElementById('users-empty')
@@ -122,21 +123,22 @@ async function initDashboard (user) {
     .eq('id', user.id)
     .single()
 
-  console.log('[Dashboard] profile:', profile, 'error:', profileError)
-
   if (!profile || (profile.role !== 'caregiver' && profile.role !== 'family')) {
     const reason = profileError
       ? `Profil-Fehler: ${profileError.message}`
       : `Rolle "${profile?.role}" hat keinen Dashboard-Zugang.`
-    console.warn('[Dashboard] Zugang verweigert:', reason)
     loginStatus.textContent = reason
     _dashInitialized = false
     await sb.auth.signOut()
     return
   }
 
+  const ROLE_LABELS = { caregiver: 'Pflegeperson', family: 'Familie' }
   const name = profile.display_name || profile.full_name || user.email
   dashUser.textContent = name
+  dashRoleBadge.textContent = ROLE_LABELS[profile.role] ?? profile.role
+  dashRoleBadge.classList.remove('hidden')
+  dashRoleBadge.className = `dash-role-badge role-${profile.role}`
   loginView.classList.add('hidden')
   dashView.classList.remove('hidden')
   showUserList()

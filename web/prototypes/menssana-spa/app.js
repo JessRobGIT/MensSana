@@ -167,8 +167,16 @@ async function initApp (user) {
   appInitialized = true
   currentUser = user
   exitSignupMode()
+
+  const { displayName, role } = await ensureProfile(user)
+
+  // Caregivers and family members belong in the dashboard, not here
+  if (role === 'caregiver' || role === 'family') {
+    window.location.href = '/MensSana/dashboard.html'
+    return
+  }
+
   showApp()
-  const displayName = await ensureProfile(user)
   headerUser.textContent = displayName || user.email
   await loadOrCreateConversation()
   await loadMessages()
@@ -180,27 +188,29 @@ async function ensureProfile (user) {
 
   const { data: existing } = await sb
     .from('profiles')
-    .select('display_name')
+    .select('display_name, role')
     .eq('id', user.id)
     .maybeSingle()
 
   if (!existing) {
-    // No profile row yet — create one
+    // No profile row yet — create one (new users always start as 'user')
     await sb.from('profiles').insert({
       id:           user.id,
       display_name: metaName,
       role:         'user',
     })
-    return metaName
+    return { displayName: metaName, role: 'user' }
   }
 
   if (!existing.display_name && metaName) {
     // Profile exists but name is blank — fill it in
     await sb.from('profiles').update({ display_name: metaName }).eq('id', user.id)
-    return metaName
   }
 
-  return existing.display_name
+  return {
+    displayName: existing.display_name || metaName,
+    role:        existing.role ?? 'user',
+  }
 }
 
 sb.auth.onAuthStateChange((event, session) => {
