@@ -203,13 +203,17 @@
       </div>
       <div class="form-group">
         <label for="cal-recurring">Wiederholung</label>
-        <select id="cal-recurring">
+        <select id="cal-recurring" class="form-select">
           <option value="once">Einmalig</option>
           <option value="daily">Täglich</option>
           <option value="weekly">Wöchentlich</option>
           <option value="monthly">Monatlich</option>
           <option value="yearly">Jährlich</option>
         </select>
+      </div>
+      <div class="form-group hidden" id="cal-end-group">
+        <label for="cal-end-date">Endet am</label>
+        <input id="cal-end-date" type="date" />
       </div>
       <div class="form-group">
         <label for="cal-notes">Notizen</label>
@@ -238,7 +242,7 @@
 
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=48"></script>
+  <script src="app.js?v=49"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')

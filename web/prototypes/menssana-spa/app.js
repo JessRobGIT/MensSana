@@ -66,6 +66,8 @@ const calAlldayInput    = document.getElementById('cal-allday')
 const calTimeGroup      = document.getElementById('cal-time-group')
 const calTimeInput      = document.getElementById('cal-time')
 const calRecurringInput = document.getElementById('cal-recurring')
+const calEndGroup       = document.getElementById('cal-end-group')
+const calEndDateInput   = document.getElementById('cal-end-date')
 const calNotesInput     = document.getElementById('cal-notes')
 const medFormOverlay = document.getElementById('med-form-overlay')
 const medFormTitle   = document.getElementById('med-form-title')
@@ -771,7 +773,23 @@ function toLocalISOString (dateStr, timeStr) {
   const mm   = String(Math.abs(off) % 60).padStart(2, '0')
   return `${dateStr}T${timeStr}:00${sign}${hh}:${mm}`
 }
-function eventsForDate (dateStr) { return _calendarEntries.filter(e => e.date === dateStr) }
+function occursOn (entry, dateStr) {
+  if (entry.date > dateStr) return false
+  if (entry.endDate && dateStr > entry.endDate) return false
+  if (entry.date === dateStr) return true
+  if (!entry.frequency || entry.frequency === 'once') return false
+  const start    = new Date(entry.date + 'T12:00:00')
+  const check    = new Date(dateStr   + 'T12:00:00')
+  const diffDays = Math.round((check - start) / 86400000)
+  switch (entry.frequency) {
+    case 'daily':   return true
+    case 'weekly':  return diffDays % 7 === 0
+    case 'monthly': return start.getDate() === check.getDate()
+    case 'yearly':  return start.getMonth() === check.getMonth() && start.getDate() === check.getDate()
+    default:        return false
+  }
+}
+function eventsForDate (dateStr) { return _calendarEntries.filter(e => occursOn(e, dateStr)) }
 
 // ── Navigation ────────────────────────────────────────────
 
@@ -1077,6 +1095,7 @@ async function loadCalendarFromDB () {
       notes:      entry.description ?? '',
       allDay:     entry.all_day ?? false,
       frequency:  entry.frequency ?? 'once',
+      endDate:    entry.ends_at ? isoDate(new Date(entry.ends_at)) : null,
       startsAt:   entry.starts_at,
       endsAt:     entry.ends_at,
       reminderAt: entry.reminder_at,
@@ -1086,6 +1105,10 @@ async function loadCalendarFromDB () {
 
 calAlldayInput.addEventListener('change', () => {
   calTimeGroup.style.visibility = calAlldayInput.checked ? 'hidden' : 'visible'
+})
+calRecurringInput.addEventListener('change', () => {
+  calEndGroup.classList.toggle('hidden', calRecurringInput.value === 'once')
+  if (calRecurringInput.value === 'once') calEndDateInput.value = ''
 })
 
 function showCalendarForm (entry, defaultDate = null) {
@@ -1097,6 +1120,8 @@ function showCalendarForm (entry, defaultDate = null) {
   calTimeGroup.style.visibility = (entry?.allDay) ? 'hidden' : 'visible'
   calTimeInput.value         = entry?.time      ?? '09:00'
   calRecurringInput.value    = entry?.frequency ?? 'once'
+  calEndDateInput.value      = entry?.endDate   ?? ''
+  calEndGroup.classList.toggle('hidden', !entry?.frequency || entry.frequency === 'once')
   calNotesInput.value        = entry?.notes     ?? ''
   calFormDelete.style.display = _editingCalId ? '' : 'none'
   calFormOverlay.classList.remove('hidden')
@@ -1128,7 +1153,8 @@ calFormSave.addEventListener('click', async () => {
   const title = calTitleInput.value.trim()
   if (!title) { calTitleInput.focus(); return }
 
-  const allDay = calAlldayInput.checked
+  const allDay   = calAlldayInput.checked
+  const freq     = calRecurringInput.value
   const ok = await saveCalendarEntryToDB({
     id:        _editingCalId,
     title,
@@ -1136,7 +1162,8 @@ calFormSave.addEventListener('click', async () => {
     time:      allDay ? '00:00' : calTimeInput.value,
     notes:     calNotesInput.value.trim(),
     allDay,
-    frequency: calRecurringInput.value,
+    frequency: freq,
+    endDate:   freq !== 'once' ? (calEndDateInput.value || null) : null,
   })
 
   if (!ok) { showBanner('Termin konnte nicht gespeichert werden.', true); return }
@@ -1154,7 +1181,7 @@ async function saveCalendarEntryToDB (entry) {
     title:       entry.title,
     description: entry.notes || null,
     starts_at:   startsAt,
-    ends_at:     entry.endsAt ?? null,
+    ends_at:     entry.endDate ? `${entry.endDate}T23:59:59Z` : (entry.endsAt ?? null),
     all_day:     entry.allDay ?? false,
     frequency:   entry.frequency ?? 'once',
     reminder_at: entry.reminderAt ?? null,

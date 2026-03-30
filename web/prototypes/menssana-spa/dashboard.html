@@ -156,6 +156,20 @@
         <input id="dash-cal-time" type="time" value="09:00" />
       </div>
       <div class="form-group">
+        <label for="dash-cal-recurring">Wiederholung</label>
+        <select id="dash-cal-recurring" class="form-select">
+          <option value="once">Einmalig</option>
+          <option value="daily">Täglich</option>
+          <option value="weekly">Wöchentlich</option>
+          <option value="monthly">Monatlich</option>
+          <option value="yearly">Jährlich</option>
+        </select>
+      </div>
+      <div class="form-group hidden" id="dash-cal-end-group">
+        <label for="dash-cal-end-date">Endet am</label>
+        <input id="dash-cal-end-date" type="date" />
+      </div>
+      <div class="form-group">
         <label for="dash-cal-notes">Notizen</label>
         <textarea id="dash-cal-notes" rows="2" placeholder="z.B. Überweisung mitbringen"></textarea>
       </div>
