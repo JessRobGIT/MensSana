@@ -354,6 +354,18 @@ html, body {
   font-style: italic;
 }
 
+.message.pending {
+  opacity: 0.6;
+}
+
+.message.pending::after {
+  content: '⏱ Ausstehend';
+  display: block;
+  font-size: 0.75rem;
+  margin-top: 6px;
+  opacity: 0.8;
+}
+
 .message.error-msg {
   display: flex;
   flex-direction: column;

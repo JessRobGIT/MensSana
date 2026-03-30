@@ -104,14 +104,62 @@ function isNetworkError (err) {
          err?.message?.toLowerCase().includes('network')
 }
 
+// ── Offline queue ─────────────────────────────────────────
+// Each item: { convId, text, el }  (el = DOM node with .pending class)
+let _offlineQueue = []
+let _isFlushing   = false
+
+function updateOfflineBanner () {
+  const n = _offlineQueue.length
+  if (!n) { showBanner(''); return }
+  const noun = n === 1 ? 'Nachricht wird' : `${n} Nachrichten werden`
+  showBanner(`Offline — ${noun} gesendet sobald Sie wieder online sind.`, true)
+}
+
+function enqueueMessage (convId, text) {
+  const el = appendMessage('user', text)
+  el.classList.add('pending')
+  _offlineQueue.push({ convId, text, el })
+  updateOfflineBanner()
+}
+
+async function flushQueue () {
+  if (!_offlineQueue.length || _isFlushing) return
+  _isFlushing = true
+
+  while (_offlineQueue.length) {
+    const item = _offlineQueue[0]
+    try {
+      await sb.from('messages').insert({
+        conversation_id: item.convId,
+        role:            'user',
+        content:         item.text,
+      })
+      item.el?.classList.remove('pending')
+      _offlineQueue.shift()
+      await callChatAPI(item.convId)
+    } catch (err) {
+      if (isNetworkError(err)) break   // still offline — stop and wait
+      _offlineQueue.shift()             // other error — skip this item
+    }
+  }
+
+  _isFlushing = false
+  updateOfflineBanner()
+}
+
 function showOffline () {
-  showBanner('Kein Internet — Gespräche können gerade nicht gesendet werden.', true)
-  sendBtn.disabled = true
+  // Keep send button active so users can queue messages while offline
+  if (_offlineQueue.length) {
+    updateOfflineBanner()
+  } else {
+    showBanner('Kein Internet — Nachrichten werden gespeichert und automatisch gesendet.', true)
+  }
 }
 
 function showOnline () {
-  showBanner('')
-  sendBtn.disabled = false
+  if (!_offlineQueue.length) showBanner('')
+  sendBtn.disabled = messageInput.value.trim() === '' || isSending
 }
 
 async function initApp (user) {
@@ -1227,16 +1275,22 @@ async function callChatAPI (convId) {
 }
 
 async function sendMessage () {
-  const text   = messageInput.value.trim()
+  const text = messageInput.value.trim()
   if (!text || isSending || !currentConversation) return
 
-  const convId = currentConversation.id
+  messageInput.value = ''
+  autoResize()
 
+  // Offline: queue for later delivery
+  if (!navigator.onLine) {
+    enqueueMessage(currentConversation.id, text)
+    return
+  }
+
+  const convId = currentConversation.id
   isSending            = true
   sendBtn.disabled     = true
   sendBtn.textContent  = 'Wird gesendet…'
-  messageInput.value   = ''
-  autoResize()
 
   try {
     appendMessage('user', text)
@@ -1250,18 +1304,19 @@ async function sendMessage () {
     return
   }
 
-  // User message is now in DB — hand off to the shared API caller
   isSending = false
   await callChatAPI(convId)
 }
 
 // ── Offline detection ─────────────────────────────────────
 window.addEventListener('offline', showOffline)
-window.addEventListener('online', () => {
+window.addEventListener('online', async () => {
   showOnline()
   if (currentUser && !currentConversation) {
-    loadOrCreateConversation().then(() => loadMessages())
+    await loadOrCreateConversation()
+    await loadMessages()
   }
+  await flushQueue()
 })
 
 sendBtn.addEventListener('click', sendMessage)
