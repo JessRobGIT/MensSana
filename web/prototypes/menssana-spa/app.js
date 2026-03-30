@@ -103,6 +103,7 @@ async function initApp (user) {
 }
 
 sb.auth.onAuthStateChange((event, session) => {
+  console.log('[Auth]', event, session?.user?.email ?? 'no user')
   if (event === 'INITIAL_SESSION' || (event === 'SIGNED_IN' && !appInitialized)) {
     if (session?.user) setTimeout(() => initApp(session.user), 0)
   } else if (event === 'SIGNED_OUT') {
@@ -175,9 +176,14 @@ signupBtn.addEventListener('click', async () => {
   }
 
   setLoginStatus('Konto wird erstellt …')
-  const { error } = await sb.auth.signUp({ email, password })
-  if (error) setLoginStatus(formatAuthError(error), true)
-  else setLoginStatus('Bitte bestätigen Sie Ihre E-Mail-Adresse.')
+  const { data, error } = await sb.auth.signUp({ email, password })
+  if (error) {
+    setLoginStatus(formatAuthError(error), true)
+  } else if (data.session) {
+    setLoginStatus('')   // session ready — onAuthStateChange fires initApp
+  } else {
+    setLoginStatus('Bitte bestätigen Sie Ihre E-Mail-Adresse.')
+  }
 })
 
 function formatAuthError (error) {
@@ -348,6 +354,7 @@ async function loadOrCreateConversation () {
     .maybeSingle()
 
   if (error) {
+    console.error('[loadOrCreateConversation] error:', error)
     if (isNetworkError(error)) showOffline()
     else if (isAuthError(error)) handleSessionExpired()
     else showBanner('Verbindungsfehler: ' + error.message, true)
