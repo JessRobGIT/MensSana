@@ -763,6 +763,14 @@ function isoDate (d) {
   // Use LOCAL date (not UTC) so calendar cells and event dates always match
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
+function toLocalISOString (dateStr, timeStr) {
+  const d    = new Date(`${dateStr}T${timeStr}`)
+  const off  = -d.getTimezoneOffset()
+  const sign = off >= 0 ? '+' : '-'
+  const hh   = String(Math.floor(Math.abs(off) / 60)).padStart(2, '0')
+  const mm   = String(Math.abs(off) % 60).padStart(2, '0')
+  return `${dateStr}T${timeStr}:00${sign}${hh}:${mm}`
+}
 function eventsForDate (dateStr) { return _calendarEntries.filter(e => e.date === dateStr) }
 
 // ── Navigation ────────────────────────────────────────────
@@ -1140,7 +1148,7 @@ calFormSave.addEventListener('click', async () => {
 
 async function saveCalendarEntryToDB (entry) {
   // All-day: use noon UTC to avoid timezone date-shift across any timezone
-  const startsAt = entry.allDay ? `${entry.date}T12:00:00Z` : `${entry.date}T${entry.time}:00`
+  const startsAt = entry.allDay ? `${entry.date}T12:00:00Z` : toLocalISOString(entry.date, entry.time)
   const payload  = {
     user_id:     currentUser.id,
     title:       entry.title,

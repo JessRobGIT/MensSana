@@ -28,6 +28,15 @@ function isoDate (d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
+function toLocalISOString (dateStr, timeStr) {
+  const d   = new Date(`${dateStr}T${timeStr}`)
+  const off = -d.getTimezoneOffset()
+  const sign = off >= 0 ? '+' : '-'
+  const hh   = String(Math.floor(Math.abs(off) / 60)).padStart(2, '0')
+  const mm   = String(Math.abs(off) % 60).padStart(2, '0')
+  return `${dateStr}T${timeStr}:00${sign}${hh}:${mm}`
+}
+
 function escHtml (s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
 }
@@ -293,12 +302,12 @@ async function showDetail (userId, name) {
       .limit(5),
 
     sb.from('medications')
-      .select('name, dosage, time_of_day, frequency')
+      .select('id, name, dosage, time_of_day, frequency, notes')
       .eq('user_id', userId)
       .order('time_of_day', { ascending: true }),
 
     sb.from('calendar_events')
-      .select('title, starts_at, all_day')
+      .select('id, title, starts_at, all_day, description')
       .eq('user_id', userId)
       .gte('starts_at', new Date().toISOString())
       .order('starts_at', { ascending: true })
@@ -523,7 +532,7 @@ async function saveCal () {
   const title = dashCalTitle.value.trim()
   if (!title || !_detailUserId) { dashCalTitle.focus(); return }
 
-  const startsAt = `${dashCalDate.value}T${dashCalTime.value}:00`
+  const startsAt = toLocalISOString(dashCalDate.value, dashCalTime.value)
   const payload  = {
     user_id:     _detailUserId,
     title,
