@@ -168,33 +168,39 @@ describe('isAuthError', () => {
   })
 })
 
-// ── MOOD_MAP ──────────────────────────────────────────────
-// app.js:1056 — maps Claude mood labels to DB enum values
-const MOOD_MAP = { positive: '4', neutral: '3', subdued: '2', concerned: '1' }
+// ── mapMoodLabelToLevel ───────────────────────────────────
+// app.js — single authoritative mapping from Edge Function labels to DB values
+function mapMoodLabelToLevel (label) {
+  switch (label) {
+    case 'positive':  return '4'
+    case 'neutral':   return '3'
+    case 'subdued':   return '2'
+    case 'concerned': return '1'
+    default:          return '3'
+  }
+}
 
-describe('MOOD_MAP', () => {
+describe('mapMoodLabelToLevel', () => {
   it('positive → 4 (highest)', () => {
-    expect(MOOD_MAP.positive).toBe('4')
+    expect(mapMoodLabelToLevel('positive')).toBe('4')
   })
 
   it('neutral → 3', () => {
-    expect(MOOD_MAP.neutral).toBe('3')
+    expect(mapMoodLabelToLevel('neutral')).toBe('3')
   })
 
   it('subdued → 2', () => {
-    expect(MOOD_MAP.subdued).toBe('2')
+    expect(mapMoodLabelToLevel('subdued')).toBe('2')
   })
 
   it('concerned → 1 (lowest)', () => {
-    expect(MOOD_MAP.concerned).toBe('1')
+    expect(mapMoodLabelToLevel('concerned')).toBe('1')
   })
 
-  it('covers all four valid mood labels', () => {
-    expect(Object.keys(MOOD_MAP)).toEqual(['positive', 'neutral', 'subdued', 'concerned'])
-  })
-
-  it('returns undefined for unknown labels (caller supplies ?? fallback)', () => {
-    expect(MOOD_MAP['happy']).toBeUndefined()
+  it('unknown labels fall back to neutral (3)', () => {
+    expect(mapMoodLabelToLevel('happy')).toBe('3')
+    expect(mapMoodLabelToLevel('')).toBe('3')
+    expect(mapMoodLabelToLevel(undefined)).toBe('3')
   })
 })
 

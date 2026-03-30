@@ -240,7 +240,94 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
+
+.detail-add-btn {
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--green-pale);
+  color: var(--green);
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.detail-add-btn:hover { background: #c8e6d7; }
+
+.detail-edit-btn {
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: transparent;
+  color: var(--green);
+  border: 1px solid var(--green-mid);
+  border-radius: 5px;
+  padding: 3px 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.detail-edit-btn:hover { background: var(--green-pale); }
+
+/* ── Form overlays ──────────────────────────────────────── */
+.dash-form-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 24px;
+}
+
+.dash-form-card {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 32px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+
+.dash-form-card h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  margin-bottom: 20px;
+}
+
+.dash-form-card .form-group { margin-bottom: 14px; }
+.dash-form-card .form-group label { font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 5px; }
+.dash-form-card .form-group input,
+.dash-form-card .form-group select,
+.dash-form-card .form-group textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+}
+.dash-form-card .form-group input:focus,
+.dash-form-card .form-group select:focus,
+.dash-form-card .form-group textarea:focus { outline: none; border-color: var(--green); }
+
+.dash-form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+.dash-form-actions .btn { width: auto; flex: 1; padding: 12px; }
+.btn-danger { background: #fdecea; color: var(--danger); border: 2px solid var(--danger); }
 
 /* Mood chart */
 .mood-chart {
@@ -264,6 +351,18 @@ body {
 .mood-bar.mx { background: var(--border); height: 4px !important; }
 
 .mood-day-label { font-size: 0.65rem; color: var(--muted); }
+
+.mood-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 10px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.mood-meta-sep { opacity: 0.4; }
 
 /* Detail lists */
 .detail-list { display: flex; flex-direction: column; gap: 8px; }

@@ -302,6 +302,18 @@ html, body {
   opacity: 0.85;
 }
 
+.mood-indicator {
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: default;
+  display: none;
+}
+
+.mood-indicator.m4,
+.mood-indicator.m3,
+.mood-indicator.m2,
+.mood-indicator.m1 { display: inline; }
+
 .btn-icon {
   background: rgba(255,255,255,0.15);
   border: none;

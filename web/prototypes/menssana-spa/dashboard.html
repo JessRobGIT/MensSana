@@ -68,6 +68,7 @@
           <div class="detail-card">
             <h3>Stimmung — letzte 7 Tage</h3>
             <div id="mood-chart" class="mood-chart"></div>
+            <div id="mood-meta" class="mood-meta"></div>
           </div>
 
           <div class="detail-card">
@@ -76,12 +77,16 @@
           </div>
 
           <div class="detail-card">
-            <h3>Medikamente</h3>
+            <h3>Medikamente
+              <button class="detail-add-btn" id="dash-med-add-btn">+ Hinzufügen</button>
+            </h3>
             <div id="meds-list" class="detail-list"></div>
           </div>
 
           <div class="detail-card">
-            <h3>Nächste Termine</h3>
+            <h3>Nächste Termine
+              <button class="detail-add-btn" id="dash-cal-add-btn">+ Hinzufügen</button>
+            </h3>
             <div id="events-list" class="detail-list"></div>
           </div>
 
@@ -89,6 +94,70 @@
       </section>
 
     </main>
+  </div>
+
+  <!-- Medikament-Formular -->
+  <div id="dash-med-overlay" class="dash-form-overlay hidden" role="dialog" aria-modal="true">
+    <div class="dash-form-card">
+      <h3 id="dash-med-form-title">Medikament hinzufügen</h3>
+      <div class="form-group">
+        <label for="dash-med-name">Name *</label>
+        <input id="dash-med-name" type="text" placeholder="z.B. Aspirin" />
+      </div>
+      <div class="form-group">
+        <label for="dash-med-dosage">Dosierung</label>
+        <input id="dash-med-dosage" type="text" placeholder="z.B. 100 mg" />
+      </div>
+      <div class="form-group">
+        <label for="dash-med-time">Uhrzeit</label>
+        <input id="dash-med-time" type="time" value="08:00" />
+      </div>
+      <div class="form-group">
+        <label for="dash-med-freq">Häufigkeit</label>
+        <select id="dash-med-freq">
+          <option value="daily">Täglich</option>
+          <option value="weekly">Wöchentlich</option>
+          <option value="as_needed">Bei Bedarf</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="dash-med-notes">Notizen</label>
+        <textarea id="dash-med-notes" rows="2" placeholder="z.B. zum Essen nehmen"></textarea>
+      </div>
+      <div class="dash-form-actions">
+        <button class="btn btn-primary" id="dash-med-save">Speichern</button>
+        <button class="btn btn-secondary" id="dash-med-cancel">Abbrechen</button>
+        <button class="btn btn-danger" id="dash-med-delete" style="display:none">Löschen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Termin-Formular -->
+  <div id="dash-cal-overlay" class="dash-form-overlay hidden" role="dialog" aria-modal="true">
+    <div class="dash-form-card">
+      <h3 id="dash-cal-form-title">Termin hinzufügen</h3>
+      <div class="form-group">
+        <label for="dash-cal-title">Titel *</label>
+        <input id="dash-cal-title" type="text" placeholder="z.B. Arzttermin" />
+      </div>
+      <div class="form-group">
+        <label for="dash-cal-date">Datum</label>
+        <input id="dash-cal-date" type="date" />
+      </div>
+      <div class="form-group">
+        <label for="dash-cal-time">Uhrzeit</label>
+        <input id="dash-cal-time" type="time" value="09:00" />
+      </div>
+      <div class="form-group">
+        <label for="dash-cal-notes">Notizen</label>
+        <textarea id="dash-cal-notes" rows="2" placeholder="z.B. Überweisung mitbringen"></textarea>
+      </div>
+      <div class="dash-form-actions">
+        <button class="btn btn-primary" id="dash-cal-save">Speichern</button>
+        <button class="btn btn-secondary" id="dash-cal-cancel">Abbrechen</button>
+        <button class="btn btn-danger" id="dash-cal-delete" style="display:none">Löschen</button>
+      </div>
+    </div>
   </div>
 
   <script src="supabase.min.js"></script>

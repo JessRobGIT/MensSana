@@ -61,6 +61,7 @@
       </div>
       <div class="header-right">
         <span class="header-user" id="header-user"></span>
+        <span id="mood-indicator" class="mood-indicator" title="Heutige Stimmung"></span>
         <button class="btn-icon" id="new-conv-btn" title="Gespräch">
           +Gespräch
         </button>
@@ -237,7 +238,7 @@
 
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=46"></script>
+  <script src="app.js?v=47"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')

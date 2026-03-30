@@ -181,6 +181,7 @@ async function initApp (user) {
   await loadOrCreateConversation()
   await loadMessages()
   await loadConversations()
+  loadTodayMood()  // non-blocking — populates mood indicator when ready
 }
 
 async function ensureProfile (user) {
@@ -1177,16 +1178,56 @@ async function deleteCalendarEntryFromDB (id) {
 
 // ── Mood ──────────────────────────────────────────────────
 
-const MOOD_MAP = { positive: '4', neutral: '3', subdued: '2', concerned: '1' }
+// Single authoritative mapping — Edge Function returns the label,
+// this function converts to the DB enum value.
+function mapMoodLabelToLevel (label) {
+  switch (label) {
+    case 'positive':  return '4'
+    case 'neutral':   return '3'
+    case 'subdued':   return '2'
+    case 'concerned': return '1'
+    default:          return '3'
+  }
+}
+
+const MOOD_INDICATOR = {
+  '4': { emoji: '😊', label: 'Positiv',        cls: 'm4' },
+  '3': { emoji: '😐', label: 'Neutral',         cls: 'm3' },
+  '2': { emoji: '🙂', label: 'Ruhig',           cls: 'm2' },
+  '1': { emoji: '😟', label: 'Besorgt',         cls: 'm1' },
+}
 
 async function saveMoodToDB (label) {
   if (!currentUser) return
-  const level = MOOD_MAP[label] ?? '3'
+  const level = mapMoodLabelToLevel(label)
   const today = isoDate(new Date())
   await sb.from('mood_entries').upsert(
     { user_id: currentUser.id, mood: level, entry_date: today, recorded_at: new Date().toISOString() },
     { onConflict: 'user_id,entry_date' }
   )
+  updateMoodIndicator(level)
+}
+
+async function loadTodayMood () {
+  if (!currentUser) return
+  const today = isoDate(new Date())
+  const { data } = await sb
+    .from('mood_entries')
+    .select('mood')
+    .eq('user_id', currentUser.id)
+    .eq('entry_date', today)
+    .maybeSingle()
+  if (data?.mood) updateMoodIndicator(data.mood)
+}
+
+function updateMoodIndicator (level) {
+  const el  = document.getElementById('mood-indicator')
+  if (!el) return
+  const info = MOOD_INDICATOR[level]
+  if (!info) return
+  el.textContent = `${info.emoji}`
+  el.title       = `Heutige Stimmung: ${info.label}`
+  el.className   = `mood-indicator ${info.cls}`
 }
 
 // ── Send ──────────────────────────────────────────────────

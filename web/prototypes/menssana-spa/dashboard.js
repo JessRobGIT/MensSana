@@ -75,9 +75,9 @@ function freqLabel (f) {
 
 // ── Auth ──────────────────────────────────────────────────
 let _dashInitialized = false
+let _detailUserId    = null   // currently viewed user in detail panel
 
 sb.auth.onAuthStateChange((event, session) => {
-  console.log('[Dashboard] auth event:', event, session?.user?.email ?? 'no user')
   if (session?.user && !_dashInitialized) {
     setTimeout(() => initDashboard(session.user), 0)
   } else if (!session?.user) {
@@ -263,6 +263,7 @@ async function showUserList () {
 detailBack.addEventListener('click', showUserList)
 
 async function showDetail (userId, name) {
+  _detailUserId = userId
   usersSection.classList.add('hidden')
   detailPanel.classList.remove('hidden')
   detailName.textContent = name
@@ -320,6 +321,8 @@ function renderMoodChart (entries) {
   const byDate = {}
   entries.forEach(e => { byDate[e.entry_date] = e.mood })
 
+  // Collect numeric values for the 7 days
+  const values = []
   let html = ''
   for (let i = 6; i >= 0; i--) {
     const d   = new Date(today); d.setDate(today.getDate() - i)
@@ -328,12 +331,37 @@ function renderMoodChart (entries) {
     const cls  = mood ? (MOOD_CLASS[mood] ?? 'mx') : 'mx'
     const h    = mood ? HEIGHT_MAP[mood] : 4
     const day  = DAY_NAMES[d.getDay()]
+    if (mood) values.push(Number(mood))
     html += `<div class="mood-bar-wrap">
       <div class="mood-bar ${cls}" style="height:${h}px" title="${MOOD_LABELS[mood] ?? 'Kein Eintrag'}"></div>
       <span class="mood-day-label">${day}</span>
     </div>`
   }
   el.innerHTML = html
+
+  // ── Metrics below the chart ────────────────────────────
+  const metaEl = document.getElementById('mood-meta')
+  if (!metaEl) return
+
+  if (values.length === 0) {
+    metaEl.textContent = 'Noch keine Einträge'
+    return
+  }
+
+  const avg = values.reduce((s, v) => s + v, 0) / values.length
+  const avgLabel = avg >= 3.5 ? 'Positiv' : avg >= 2.5 ? 'Neutral' : avg >= 1.5 ? 'Ruhig' : 'Besorgt'
+
+  // Trend: recent 3 days vs older days
+  let trendText = '↔ Stabil'
+  if (values.length >= 4) {
+    const recent = values.slice(-3).reduce((s, v) => s + v, 0) / 3
+    const older  = values.slice(0, -3).reduce((s, v) => s + v, 0) / values.slice(0, -3).length
+    const diff   = recent - older
+    if (diff > 0.4)       trendText = '↑ Eher besser'
+    else if (diff < -0.4) trendText = '↓ Eher schlechter'
+  }
+
+  metaEl.innerHTML = `<span>Ø ${avgLabel}</span><span class="mood-meta-sep">·</span><span>${trendText}</span>`
 }
 
 function renderConversations (convs) {
@@ -349,26 +377,178 @@ function renderConversations (convs) {
 function renderMedications (meds) {
   const el = document.getElementById('meds-list')
   if (!meds.length) { el.innerHTML = '<span class="detail-empty">Keine Medikamente eingetragen.</span>'; return }
-  el.innerHTML = meds.map(m => `
-    <div class="detail-row">
+  el.innerHTML = ''
+  meds.forEach(m => {
+    const row = document.createElement('div')
+    row.className = 'detail-row'
+    row.innerHTML = `
       <div>
         <div class="detail-row-main">${escHtml(m.name)}${m.dosage ? ' · '+escHtml(m.dosage) : ''}</div>
-        <div class="detail-row-sub">${freqLabel(m.frequency)}</div>
+        <div class="detail-row-sub">${freqLabel(m.frequency)}${m.time_of_day ? ' · '+String(m.time_of_day).slice(0,5)+' Uhr' : ''}</div>
       </div>
-      <span class="detail-row-sub">${m.time_of_day ? String(m.time_of_day).slice(0,5)+' Uhr' : ''}</span>
-    </div>`).join('')
+      <button class="detail-edit-btn" data-id="${m.id}">Bearbeiten</button>`
+    row.querySelector('.detail-edit-btn').addEventListener('click', () => openMedForm(m))
+    el.appendChild(row)
+  })
 }
 
 function renderEvents (events) {
   const el = document.getElementById('events-list')
   if (!events.length) { el.innerHTML = '<span class="detail-empty">Keine bevorstehenden Termine.</span>'; return }
-  el.innerHTML = events.map(e => {
-    const d = new Date(e.starts_at)
+  el.innerHTML = ''
+  events.forEach(e => {
+    const d       = new Date(e.starts_at)
     const dateStr = d.toLocaleDateString('de-DE', { weekday:'short', day:'numeric', month:'short' })
     const timeStr = e.all_day ? 'Ganztägig' : d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' })+' Uhr'
-    return `<div class="detail-row">
-      <span class="detail-row-main">${escHtml(e.title)}</span>
-      <span class="detail-row-sub">${dateStr}, ${timeStr}</span>
-    </div>`
-  }).join('')
+    const row = document.createElement('div')
+    row.className = 'detail-row'
+    row.innerHTML = `
+      <div>
+        <div class="detail-row-main">${escHtml(e.title)}</div>
+        <div class="detail-row-sub">${dateStr}, ${timeStr}</div>
+      </div>
+      <button class="detail-edit-btn" data-id="${e.id}">Bearbeiten</button>`
+    row.querySelector('.detail-edit-btn').addEventListener('click', () => openCalForm(e))
+    el.appendChild(row)
+  })
+}
+
+// ── Medication CRUD ────────────────────────────────────────
+
+const dashMedOverlay  = document.getElementById('dash-med-overlay')
+const dashMedName     = document.getElementById('dash-med-name')
+const dashMedDosage   = document.getElementById('dash-med-dosage')
+const dashMedTime     = document.getElementById('dash-med-time')
+const dashMedFreq     = document.getElementById('dash-med-freq')
+const dashMedNotes    = document.getElementById('dash-med-notes')
+const dashMedDelete   = document.getElementById('dash-med-delete')
+let _editingMedId = null
+
+document.getElementById('dash-med-add-btn').addEventListener('click', () => openMedForm(null))
+document.getElementById('dash-med-cancel').addEventListener('click', closeMedForm)
+document.getElementById('dash-med-save').addEventListener('click', saveMed)
+dashMedDelete.addEventListener('click', deleteMed)
+
+function openMedForm (med) {
+  _editingMedId = med?.id ?? null
+  document.getElementById('dash-med-form-title').textContent = med ? 'Medikament bearbeiten' : 'Medikament hinzufügen'
+  dashMedName.value   = med?.name ?? ''
+  dashMedDosage.value = med?.dosage ?? ''
+  dashMedTime.value   = med?.time_of_day ? String(med.time_of_day).slice(0,5) : '08:00'
+  dashMedFreq.value   = med?.frequency ?? 'daily'
+  dashMedNotes.value  = med?.notes ?? ''
+  dashMedDelete.style.display = med ? '' : 'none'
+  dashMedOverlay.classList.remove('hidden')
+  dashMedName.focus()
+}
+
+function closeMedForm () {
+  dashMedOverlay.classList.add('hidden')
+  _editingMedId = null
+}
+
+async function saveMed () {
+  const name = dashMedName.value.trim()
+  if (!name || !_detailUserId) { dashMedName.focus(); return }
+
+  const payload = {
+    user_id:     _detailUserId,
+    name,
+    dosage:      dashMedDosage.value.trim() || null,
+    frequency:   dashMedFreq.value,
+    time_of_day: dashMedTime.value ? dashMedTime.value + ':00' : null,
+    notes:       dashMedNotes.value.trim() || null,
+    active:      true,
+  }
+
+  let error
+  if (_editingMedId) {
+    ;({ error } = await sb.from('medications').update(payload).eq('id', _editingMedId).eq('user_id', _detailUserId))
+  } else {
+    ;({ error } = await sb.from('medications').insert([payload]))
+  }
+
+  if (error) { alert('Speichern fehlgeschlagen: ' + error.message); return }
+  closeMedForm()
+  showDetail(_detailUserId, detailName.textContent)
+}
+
+async function deleteMed () {
+  if (!_editingMedId || !_detailUserId) return
+  if (!confirm('Dieses Medikament wirklich löschen?')) return
+  await sb.from('medications').delete().eq('id', _editingMedId).eq('user_id', _detailUserId)
+  closeMedForm()
+  showDetail(_detailUserId, detailName.textContent)
+}
+
+// ── Calendar CRUD ──────────────────────────────────────────
+
+const dashCalOverlay = document.getElementById('dash-cal-overlay')
+const dashCalTitle   = document.getElementById('dash-cal-title')
+const dashCalDate    = document.getElementById('dash-cal-date')
+const dashCalTime    = document.getElementById('dash-cal-time')
+const dashCalNotes   = document.getElementById('dash-cal-notes')
+const dashCalDelete  = document.getElementById('dash-cal-delete')
+let _editingCalId = null
+
+document.getElementById('dash-cal-add-btn').addEventListener('click', () => openCalForm(null))
+document.getElementById('dash-cal-cancel').addEventListener('click', closeCalForm)
+document.getElementById('dash-cal-save').addEventListener('click', saveCal)
+dashCalDelete.addEventListener('click', deleteCal)
+
+function openCalForm (event) {
+  _editingCalId = event?.id ?? null
+  document.getElementById('dash-cal-form-title').textContent = event ? 'Termin bearbeiten' : 'Termin hinzufügen'
+  dashCalTitle.value = event?.title ?? ''
+  if (event?.starts_at) {
+    const d = new Date(event.starts_at)
+    dashCalDate.value = isoDate(d)
+    dashCalTime.value = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0')
+  } else {
+    dashCalDate.value = isoDate(new Date())
+    dashCalTime.value = '09:00'
+  }
+  dashCalNotes.value  = event?.description ?? ''
+  dashCalDelete.style.display = event ? '' : 'none'
+  dashCalOverlay.classList.remove('hidden')
+  dashCalTitle.focus()
+}
+
+function closeCalForm () {
+  dashCalOverlay.classList.add('hidden')
+  _editingCalId = null
+}
+
+async function saveCal () {
+  const title = dashCalTitle.value.trim()
+  if (!title || !_detailUserId) { dashCalTitle.focus(); return }
+
+  const startsAt = `${dashCalDate.value}T${dashCalTime.value}:00`
+  const payload  = {
+    user_id:     _detailUserId,
+    title,
+    starts_at:   startsAt,
+    all_day:     false,
+    description: dashCalNotes.value.trim() || null,
+    frequency:   'once',
+  }
+
+  let error
+  if (_editingCalId) {
+    ;({ error } = await sb.from('calendar_events').update(payload).eq('id', _editingCalId).eq('user_id', _detailUserId))
+  } else {
+    ;({ error } = await sb.from('calendar_events').insert([payload]))
+  }
+
+  if (error) { alert('Speichern fehlgeschlagen: ' + error.message); return }
+  closeCalForm()
+  showDetail(_detailUserId, detailName.textContent)
+}
+
+async function deleteCal () {
+  if (!_editingCalId || !_detailUserId) return
+  if (!confirm('Diesen Termin wirklich löschen?')) return
+  await sb.from('calendar_events').delete().eq('id', _editingCalId).eq('user_id', _detailUserId)
+  closeCalForm()
+  showDetail(_detailUserId, detailName.textContent)
 }
