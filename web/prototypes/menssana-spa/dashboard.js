@@ -3,7 +3,10 @@
 const SUPABASE_URL      = 'https://sycfzysiwshdijeintyt.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN5Y2Z6eXNpd3NoZGlqZWludHl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2NDk2MzUsImV4cCI6MjA5MDIyNTYzNX0.jaZwlY7dmWIHUm57L6j_gWkK9IIGn27-k2mV_n1PoDc'
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+// Separate storageKey so dashboard session doesn't collide with companion app
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { storageKey: 'menssana-dashboard-auth' }
+})
 
 // ── DOM refs ──────────────────────────────────────────────
 const loginView    = document.getElementById('login-view')
@@ -180,12 +183,12 @@ async function showUserList () {
     .in('user_id', userIds)
     .eq('entry_date', today)
 
-  // Load next medication per user (first alphabetically for MVP)
+  // Load next medication per user
   const { data: meds } = await sb
     .from('medications')
-    .select('user_id, name, scheduled_time')
+    .select('user_id, name, time_of_day')
     .in('user_id', userIds)
-    .order('scheduled_time', { ascending: true })
+    .order('time_of_day', { ascending: true })
 
   // Load next calendar event per user
   const { data: events } = await sb
@@ -241,7 +244,7 @@ async function showUserList () {
         </div>
         <div class="stat-item">
           <div class="stat-label">Nächstes Medikament</div>
-          <div class="stat-value">${med ? `${escHtml(med.name)} ${med.scheduled_time ? med.scheduled_time.slice(0,5)+' Uhr' : ''}` : '—'}</div>
+          <div class="stat-value">${med ? `${escHtml(med.name)} ${med.time_of_day ? String(med.time_of_day).slice(0,5)+' Uhr' : ''}` : '—'}</div>
         </div>
         <div class="stat-item">
           <div class="stat-label">Nächster Termin</div>
@@ -287,9 +290,9 @@ async function showDetail (userId, name) {
       .limit(5),
 
     sb.from('medications')
-      .select('name, dosage, scheduled_time, frequency')
+      .select('name, dosage, time_of_day, frequency')
       .eq('user_id', userId)
-      .order('scheduled_time', { ascending: true }),
+      .order('time_of_day', { ascending: true }),
 
     sb.from('calendar_events')
       .select('title, starts_at, all_day')
@@ -350,7 +353,7 @@ function renderMedications (meds) {
         <div class="detail-row-main">${escHtml(m.name)}${m.dosage ? ' · '+escHtml(m.dosage) : ''}</div>
         <div class="detail-row-sub">${freqLabel(m.frequency)}</div>
       </div>
-      <span class="detail-row-sub">${m.scheduled_time ? m.scheduled_time.slice(0,5)+' Uhr' : ''}</span>
+      <span class="detail-row-sub">${m.time_of_day ? String(m.time_of_day).slice(0,5)+' Uhr' : ''}</span>
     </div>`).join('')
 }
 
