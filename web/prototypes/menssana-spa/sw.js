@@ -1,7 +1,7 @@
 // MensSana — Service Worker
 // Caches app shell for offline use. Chat requires network.
 
-const CACHE = 'menssana-v6'
+const CACHE = 'menssana-v7'
 const ASSETS = [
   '/MensSana/',
   '/MensSana/index.html',

@@ -354,6 +354,29 @@ html, body {
   font-style: italic;
 }
 
+.message.error-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #fdecea;
+  border-color: #f5c6c2;
+  color: var(--danger);
+}
+
+.retry-btn {
+  align-self: flex-start;
+  background: var(--danger);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.retry-btn:hover { background: #a93226; }
+
 /* ── INPUT BAR ─────────────────────────────────────────── */
 
 .input-bar {

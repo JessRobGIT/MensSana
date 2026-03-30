@@ -156,7 +156,6 @@ async function ensureProfile (user) {
 }
 
 sb.auth.onAuthStateChange((event, session) => {
-  console.log('[Auth]', event, session?.user?.email ?? 'no user')
   if (event === 'INITIAL_SESSION' || (event === 'SIGNED_IN' && !appInitialized)) {
     if (session?.user) setTimeout(() => initApp(session.user), 0)
   } else if (event === 'SIGNED_OUT') {
@@ -1133,32 +1132,30 @@ async function saveMoodToDB (label) {
 }
 
 // ── Send ──────────────────────────────────────────────────
-async function sendMessage () {
-  const text   = messageInput.value.trim()
-  if (!text || isSending || !currentConversation) return
 
-  // Snapshot: pin the conversation this message belongs to
-  const convId = currentConversation.id
+function appendErrorWithRetry (convId, errorText) {
+  const div         = document.createElement('div')
+  div.className     = 'message assistant error-msg'
+  const span        = document.createElement('span')
+  span.textContent  = errorText
+  const btn         = document.createElement('button')
+  btn.className     = 'retry-btn'
+  btn.textContent   = 'Erneut versuchen'
+  btn.addEventListener('click', () => { div.remove(); callChatAPI(convId) })
+  div.appendChild(span)
+  div.appendChild(btn)
+  messagesEl.appendChild(div)
+  messagesEl.scrollTop = messagesEl.scrollHeight
+}
 
-  isSending            = true
-  sendBtn.disabled     = true
-  sendBtn.textContent  = 'Wird gesendet…'
-  messageInput.value   = ''
-  autoResize()
+async function callChatAPI (convId) {
+  if (isSending) return
+  isSending           = true
+  sendBtn.disabled    = true
+  sendBtn.textContent = 'Wird gesendet…'
 
   let typingEl = null
-
   try {
-    appendMessage('user', text)
-
-    // Persist user message to the pinned conversation
-    await sb.from('messages').insert({
-      conversation_id: convId,
-      role:            'user',
-      content:         text,
-    })
-
-    // Fetch history for the pinned conversation
     const { data: history } = await sb
       .from('messages')
       .select('role, content')
@@ -1166,7 +1163,6 @@ async function sendMessage () {
       .order('created_at', { ascending: true })
       .limit(20)
 
-    // Typing indicator — only show if still in the same conversation
     if (currentConversation?.id === convId) {
       typingEl             = document.createElement('div')
       typingEl.className   = 'message assistant typing'
@@ -1179,7 +1175,7 @@ async function sendMessage () {
     const fnRes = await fetch(
       'https://sycfzysiwshdijeintyt.supabase.co/functions/v1/chat',
       {
-        method: 'POST',
+        method:  'POST',
         headers: {
           'Content-Type':  'application/json',
           'Authorization': `Bearer ${session?.access_token ?? SUPABASE_ANON_KEY}`,
@@ -1195,46 +1191,32 @@ async function sendMessage () {
     const rawBody = await fnRes.text()
     if (fnRes.ok) {
       try { fnJson = JSON.parse(rawBody) } catch (_) {}
-    } else {
-      showBanner(`Fehler ${fnRes.status}: ${rawBody}`, true)
-    }
-    const reply = fnJson?.content?.trim() ||
-      'Entschuldigung, ich konnte gerade nicht antworten. Bitte versuchen Sie es noch einmal.'
-
-    // Only show reply in UI if user is still viewing this conversation
-    if (currentConversation?.id === convId) {
-      appendMessage('assistant', reply)
     }
 
-    // Always persist the reply to the correct (pinned) conversation
     if (fnJson?.content?.trim()) {
-      await sb.from('messages').insert({
-        conversation_id: convId,
-        role:            'assistant',
-        content:         reply,
-      })
-      // Save today's mood (upsert — one value per day)
+      const reply = fnJson.content.trim()
+      if (currentConversation?.id === convId) appendMessage('assistant', reply)
+      await sb.from('messages').insert({ conversation_id: convId, role: 'assistant', content: reply })
       if (fnJson.mood) saveMoodToDB(fnJson.mood)
+      await sb.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', convId)
+      await loadConversations()
+    } else {
+      const errText = fnRes.ok
+        ? 'Entschuldigung, ich konnte gerade nicht antworten. Bitte versuchen Sie es noch einmal.'
+        : `Fehler ${fnRes.status} — bitte erneut versuchen.`
+      if (currentConversation?.id === convId) appendErrorWithRetry(convId, errText)
     }
-
-    // Update timestamp for the pinned conversation
-    await sb
-      .from('conversations')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', convId)
-    await loadConversations()
 
   } catch (err) {
     if (typingEl) typingEl.remove()
-    if (isNetworkError(err)) {
-      showOffline()
-      if (currentConversation?.id === convId)
-        appendMessage('assistant', 'Kein Internet — bitte versuchen Sie es erneut wenn Sie wieder online sind.')
-    } else if (isAuthError(err)) {
+    if (isAuthError(err)) {
       handleSessionExpired()
     } else {
-      if (currentConversation?.id === convId)
-        appendMessage('assistant', 'Entschuldigung, es ist ein Fehler aufgetreten.')
+      const errText = isNetworkError(err)
+        ? 'Kein Internet — bitte versuchen Sie es erneut wenn Sie wieder online sind.'
+        : 'Entschuldigung, es ist ein Fehler aufgetreten.'
+      if (isNetworkError(err)) showOffline()
+      if (currentConversation?.id === convId) appendErrorWithRetry(convId, errText)
     }
   } finally {
     isSending           = false
@@ -1242,6 +1224,35 @@ async function sendMessage () {
     sendBtn.textContent = 'Senden'
     messageInput.focus()
   }
+}
+
+async function sendMessage () {
+  const text   = messageInput.value.trim()
+  if (!text || isSending || !currentConversation) return
+
+  const convId = currentConversation.id
+
+  isSending            = true
+  sendBtn.disabled     = true
+  sendBtn.textContent  = 'Wird gesendet…'
+  messageInput.value   = ''
+  autoResize()
+
+  try {
+    appendMessage('user', text)
+    await sb.from('messages').insert({ conversation_id: convId, role: 'user', content: text })
+  } catch (err) {
+    isSending           = false
+    sendBtn.disabled    = messageInput.value.trim() === ''
+    sendBtn.textContent = 'Senden'
+    if (isAuthError(err)) handleSessionExpired()
+    else showBanner('Nachricht konnte nicht gespeichert werden.', true)
+    return
+  }
+
+  // User message is now in DB — hand off to the shared API caller
+  isSending = false
+  await callChatAPI(convId)
 }
 
 // ── Offline detection ─────────────────────────────────────
