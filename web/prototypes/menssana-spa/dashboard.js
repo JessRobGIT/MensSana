@@ -310,7 +310,7 @@ async function showDetail (userId, name) {
       .order('time_of_day', { ascending: true }),
 
     sb.from('calendar_events')
-      .select('id, title, starts_at, all_day, description')
+      .select('id, title, starts_at, all_day, description, frequency, ends_at')
       .eq('user_id', userId)
       .gte('starts_at', (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString() })())
       .order('starts_at', { ascending: true }),
@@ -479,12 +479,13 @@ function renderDashEventList (dateStr) {
     const d        = new Date(e.starts_at)
     const dateLabel = d.toLocaleDateString('de-DE', { weekday:'short', day:'numeric', month:'short' })
     const timeStr  = e.all_day ? 'Ganztägig' : d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' })+' Uhr'
+    const freqStr  = e.frequency && e.frequency !== 'once' ? ' · ' + freqLabel(e.frequency) : ''
     const row = document.createElement('div')
     row.className = 'detail-row'
     row.innerHTML = `
       <div>
         <div class="detail-row-main">${escHtml(e.title)}</div>
-        <div class="detail-row-sub">${dateLabel}, ${timeStr}</div>
+        <div class="detail-row-sub">${dateLabel}, ${timeStr}${freqStr}</div>
       </div>
       <button class="detail-edit-btn" data-id="${e.id}">Bearbeiten</button>`
     row.querySelector('.detail-edit-btn').addEventListener('click', () => openCalForm(e))
@@ -562,17 +563,24 @@ async function deleteMed () {
 
 // ── Calendar CRUD ──────────────────────────────────────────
 
-const dashCalOverlay = document.getElementById('dash-cal-overlay')
-const dashCalTitle   = document.getElementById('dash-cal-title')
-const dashCalDate    = document.getElementById('dash-cal-date')
-const dashCalTime    = document.getElementById('dash-cal-time')
-const dashCalNotes   = document.getElementById('dash-cal-notes')
-const dashCalDelete  = document.getElementById('dash-cal-delete')
+const dashCalOverlay    = document.getElementById('dash-cal-overlay')
+const dashCalTitle      = document.getElementById('dash-cal-title')
+const dashCalDate       = document.getElementById('dash-cal-date')
+const dashCalTime       = document.getElementById('dash-cal-time')
+const dashCalRecurring  = document.getElementById('dash-cal-recurring')
+const dashCalEndGroup   = document.getElementById('dash-cal-end-group')
+const dashCalEndDate    = document.getElementById('dash-cal-end-date')
+const dashCalNotes      = document.getElementById('dash-cal-notes')
+const dashCalDelete     = document.getElementById('dash-cal-delete')
 let _editingCalId = null
 
 document.getElementById('dash-cal-add-btn').addEventListener('click', () => openCalForm(null))
 document.getElementById('dash-cal-cancel').addEventListener('click', closeCalForm)
 document.getElementById('dash-cal-save').addEventListener('click', saveCal)
+dashCalRecurring.addEventListener('change', () => {
+  dashCalEndGroup.classList.toggle('hidden', dashCalRecurring.value === 'once')
+  if (dashCalRecurring.value === 'once') dashCalEndDate.value = ''
+})
 document.getElementById('dash-cal-prev').addEventListener('click', () => {
   _dashCalDate = new Date(_dashCalDate.getFullYear(), _dashCalDate.getMonth() - 1, 1)
   _dashSelectedDate = null
@@ -604,6 +612,10 @@ function openCalForm (event) {
     dashCalDate.value = isoDate(new Date())
     dashCalTime.value = '09:00'
   }
+  const freq = event?.frequency ?? 'once'
+  dashCalRecurring.value = freq
+  dashCalEndDate.value   = event?.ends_at ? isoDate(new Date(event.ends_at)) : ''
+  dashCalEndGroup.classList.toggle('hidden', freq === 'once')
   dashCalNotes.value  = event?.description ?? ''
   dashCalDelete.style.display = event ? '' : 'none'
   dashCalOverlay.classList.remove('hidden')
@@ -620,13 +632,15 @@ async function saveCal () {
   if (!title || !_detailUserId) { dashCalTitle.focus(); return }
 
   const startsAt = toLocalISOString(dashCalDate.value, dashCalTime.value)
+  const freq     = dashCalRecurring.value
   const payload  = {
     user_id:     _detailUserId,
     title,
     starts_at:   startsAt,
     all_day:     false,
     description: dashCalNotes.value.trim() || null,
-    frequency:   'once',
+    frequency:   freq,
+    ends_at:     freq !== 'once' && dashCalEndDate.value ? `${dashCalEndDate.value}T23:59:59Z` : null,
   }
 
   let error
