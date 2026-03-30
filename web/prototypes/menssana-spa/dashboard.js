@@ -70,10 +70,14 @@ function freqLabel (f) {
 }
 
 // ── Auth ──────────────────────────────────────────────────
-sb.auth.onAuthStateChange((_event, session) => {
-  if (session?.user) {
+let _dashInitialized = false
+
+sb.auth.onAuthStateChange((event, session) => {
+  console.log('[Dashboard] auth event:', event, session?.user?.email ?? 'no user')
+  if (session?.user && !_dashInitialized) {
     setTimeout(() => initDashboard(session.user), 0)
-  } else {
+  } else if (!session?.user) {
+    _dashInitialized = false
     showLogin()
   }
 })
@@ -106,15 +110,24 @@ function showLogin () {
 }
 
 async function initDashboard (user) {
+  _dashInitialized = true
+
   // Load profile and verify role
-  const { data: profile } = await sb
+  const { data: profile, error: profileError } = await sb
     .from('profiles')
     .select('role, display_name, full_name')
     .eq('id', user.id)
     .single()
 
+  console.log('[Dashboard] profile:', profile, 'error:', profileError)
+
   if (!profile || (profile.role !== 'caregiver' && profile.role !== 'family')) {
-    loginStatus.textContent = 'Dieses Konto hat keinen Dashboard-Zugang. Bitte als Benutzer anmelden.'
+    const reason = profileError
+      ? `Profil-Fehler: ${profileError.message}`
+      : `Rolle "${profile?.role}" hat keinen Dashboard-Zugang.`
+    console.warn('[Dashboard] Zugang verweigert:', reason)
+    loginStatus.textContent = reason
+    _dashInitialized = false
     await sb.auth.signOut()
     return
   }
