@@ -15,13 +15,16 @@ let _medications        = []
 let _editingMedId       = null
 
 // ── DOM refs ─────────────────────────────────────────────
-const loginView       = document.getElementById('login-view')
-const appView         = document.getElementById('app-view')
-const loginForm       = document.getElementById('login-form')
-const signupBtn       = document.getElementById('signup-btn')
-const loginStatus     = document.getElementById('login-status')
-const emailInput      = document.getElementById('email')
-const passwordInput   = document.getElementById('password')
+const loginView        = document.getElementById('login-view')
+const appView          = document.getElementById('app-view')
+const loginForm        = document.getElementById('login-form')
+const signupBtn        = document.getElementById('signup-btn')
+const backToLoginBtn   = document.getElementById('back-to-login-btn')
+const loginStatus      = document.getElementById('login-status')
+const emailInput       = document.getElementById('email')
+const passwordInput    = document.getElementById('password')
+const nameInput        = document.getElementById('name')
+const nameGroup        = document.getElementById('name-group')
 const messagesEl      = document.getElementById('messages')
 const messageInput    = document.getElementById('message-input')
 const sendBtn         = document.getElementById('send-btn')
@@ -76,6 +79,26 @@ const medNotesInput  = document.getElementById('med-notes')
 
 // ── Auth state ───────────────────────────────────────────
 
+let _signupMode = false
+
+function enterSignupMode () {
+  _signupMode = true
+  nameGroup.classList.remove('hidden')
+  nameInput.focus()
+  signupBtn.textContent = 'Registrieren'
+  backToLoginBtn.style.display = ''
+  setLoginStatus('')
+}
+
+function exitSignupMode () {
+  _signupMode = false
+  nameGroup.classList.add('hidden')
+  nameInput.value = ''
+  signupBtn.textContent = 'Neues Konto erstellen'
+  backToLoginBtn.style.display = 'none'
+  setLoginStatus('')
+}
+
 function isNetworkError (err) {
   return err?.message?.toLowerCase().includes('fetch') ||
          err?.message?.toLowerCase().includes('network')
@@ -95,11 +118,41 @@ async function initApp (user) {
   if (appInitialized) return
   appInitialized = true
   currentUser = user
-  headerUser.textContent = user.email
+  exitSignupMode()
   showApp()
+  const displayName = await ensureProfile(user)
+  headerUser.textContent = displayName || user.email
   await loadOrCreateConversation()
   await loadMessages()
   await loadConversations()
+}
+
+async function ensureProfile (user) {
+  const metaName = user.user_metadata?.display_name?.trim() || null
+
+  const { data: existing } = await sb
+    .from('profiles')
+    .select('display_name')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (!existing) {
+    // No profile row yet — create one
+    await sb.from('profiles').insert({
+      id:           user.id,
+      display_name: metaName,
+      role:         'user',
+    })
+    return metaName
+  }
+
+  if (!existing.display_name && metaName) {
+    // Profile exists but name is blank — fill it in
+    await sb.from('profiles').update({ display_name: metaName }).eq('id', user.id)
+    return metaName
+  }
+
+  return existing.display_name
 }
 
 sb.auth.onAuthStateChange((event, session) => {
@@ -163,8 +216,16 @@ loginForm.addEventListener('submit', async (e) => {
 })
 
 signupBtn.addEventListener('click', async () => {
+  // First click: enter signup mode and show name field
+  if (!_signupMode) {
+    enterSignupMode()
+    return
+  }
+
+  // Second click: perform registration
   const email    = emailInput.value.trim()
   const password = passwordInput.value
+  const name     = nameInput.value.trim()
 
   if (!email || !password) {
     setLoginStatus('Bitte E-Mail und Passwort eingeben.', true)
@@ -176,7 +237,11 @@ signupBtn.addEventListener('click', async () => {
   }
 
   setLoginStatus('Konto wird erstellt …')
-  const { data, error } = await sb.auth.signUp({ email, password })
+  const { data, error } = await sb.auth.signUp({
+    email,
+    password,
+    options: { data: { display_name: name || null } },
+  })
   if (error) {
     setLoginStatus(formatAuthError(error), true)
   } else if (data.session) {
@@ -185,6 +250,8 @@ signupBtn.addEventListener('click', async () => {
     setLoginStatus('Bitte bestätigen Sie Ihre E-Mail-Adresse.')
   }
 })
+
+backToLoginBtn.addEventListener('click', exitSignupMode)
 
 function formatAuthError (error) {
   const map = {

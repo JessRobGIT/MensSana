@@ -19,6 +19,11 @@
       </div>
 
       <form id="login-form" novalidate>
+        <div class="form-group hidden" id="name-group">
+          <label for="name">Ihr Name</label>
+          <input type="text" id="name" autocomplete="name"
+                 placeholder="z.B. Anna Müller" />
+        </div>
         <div class="form-group">
           <label for="email">E-Mail-Adresse</label>
           <input type="email" id="email" autocomplete="email"
@@ -35,6 +40,9 @@
         </button>
         <button type="button" class="btn btn-secondary" id="signup-btn">
           Neues Konto erstellen
+        </button>
+        <button type="button" class="btn btn-link" id="back-to-login-btn" style="display:none">
+          ← Zurück zur Anmeldung
         </button>
 
         <p class="status-msg" id="login-status" role="alert"></p>
@@ -229,7 +237,7 @@
 
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=42"></script>
+  <script src="app.js?v=43"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')

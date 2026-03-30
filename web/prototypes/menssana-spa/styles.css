@@ -133,6 +133,18 @@ html, body {
 
 .btn-secondary:hover:not(:disabled) { background: var(--green-pale); }
 
+.btn-link {
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 400;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.btn-link:hover { color: var(--green); }
+
 .btn-danger {
   background: #fdecea;
   color: var(--danger);
