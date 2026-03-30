@@ -83,8 +83,11 @@ function freqLabel (f) {
 }
 
 // ── Auth ──────────────────────────────────────────────────
-let _dashInitialized = false
-let _detailUserId    = null   // currently viewed user in detail panel
+let _dashInitialized  = false
+let _detailUserId     = null   // currently viewed user in detail panel
+let _dashCalEvents    = []     // cached events for mini calendar
+let _dashCalDate      = new Date()
+let _dashSelectedDate = null
 
 sb.auth.onAuthStateChange((event, session) => {
   if (session?.user && !_dashInitialized) {
@@ -309,15 +312,14 @@ async function showDetail (userId, name) {
     sb.from('calendar_events')
       .select('id, title, starts_at, all_day, description')
       .eq('user_id', userId)
-      .gte('starts_at', new Date().toISOString())
-      .order('starts_at', { ascending: true })
-      .limit(5),
+      .gte('starts_at', (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString() })())
+      .order('starts_at', { ascending: true }),
   ])
 
   renderMoodChart(moodRes.data ?? [])
   renderConversations(convRes.data ?? [])
   renderMedications(medsRes.data ?? [])
-  renderEvents(eventsRes.data ?? [])
+  renderDashCalendar(eventsRes.data ?? [])
 }
 
 function renderMoodChart (entries) {
@@ -401,20 +403,88 @@ function renderMedications (meds) {
   })
 }
 
-function renderEvents (events) {
-  const el = document.getElementById('events-list')
-  if (!events.length) { el.innerHTML = '<span class="detail-empty">Keine bevorstehenden Termine.</span>'; return }
+function renderDashCalendar (events) {
+  _dashCalEvents    = events
+  _dashCalDate      = new Date()
+  _dashSelectedDate = null
+  renderDashMiniCal()
+  renderDashEventList(null)
+}
+
+function renderDashMiniCal () {
+  const year    = _dashCalDate.getFullYear()
+  const month   = _dashCalDate.getMonth()
+  const todayStr = isoDate(new Date())
+
+  document.getElementById('dash-cal-month-title').textContent =
+    _dashCalDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+
+  const byDate = {}
+  _dashCalEvents.forEach(e => {
+    const key = isoDate(new Date(e.starts_at))
+    byDate[key] = (byDate[key] || 0) + 1
+  })
+
+  const firstDay = new Date(year, month, 1)
+  const lastDay  = new Date(year, month + 1, 0)
+  const startDow = (firstDay.getDay() + 6) % 7
+  const DAY_NAMES = ['Mo','Di','Mi','Do','Fr','Sa','So']
+
+  let html = DAY_NAMES.map(n => `<div class="dmg-header">${n}</div>`).join('')
+  for (let i = 0; i < startDow; i++) html += '<div class="dmg-cell other"></div>'
+
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const dateStr = isoDate(new Date(year, month, d))
+    const count   = byDate[dateStr] || 0
+    const cls = ['dmg-cell',
+      dateStr === todayStr        ? 'today'      : '',
+      dateStr === _dashSelectedDate ? 'selected' : '',
+      count                       ? 'has-events' : '',
+    ].filter(Boolean).join(' ')
+    html += `<div class="${cls}" data-date="${dateStr}">
+      <span class="dmg-num">${d}</span>
+      ${count ? '<span class="dmg-dot"></span>' : ''}
+    </div>`
+  }
+
+  const remainder = (startDow + lastDay.getDate()) % 7
+  if (remainder) for (let i = remainder; i < 7; i++) html += '<div class="dmg-cell other"></div>'
+
+  const grid = document.getElementById('dash-mini-grid')
+  grid.innerHTML = html
+  grid.querySelectorAll('.dmg-cell:not(.other)').forEach(cell => {
+    cell.addEventListener('click', () => {
+      _dashSelectedDate = cell.dataset.date
+      renderDashMiniCal()
+      renderDashEventList(_dashSelectedDate)
+    })
+  })
+}
+
+function renderDashEventList (dateStr) {
+  const el     = document.getElementById('events-list')
+  const allBtn = document.getElementById('dash-cal-all-btn')
+  allBtn.style.display = dateStr ? '' : 'none'
+
+  const events = dateStr
+    ? _dashCalEvents.filter(e => isoDate(new Date(e.starts_at)) === dateStr)
+    : _dashCalEvents.filter(e => new Date(e.starts_at) >= new Date(new Date().setHours(0,0,0,0)))
+
+  if (!events.length) {
+    el.innerHTML = `<span class="detail-empty">${dateStr ? 'Keine Termine an diesem Tag.' : 'Keine bevorstehenden Termine.'}</span>`
+    return
+  }
   el.innerHTML = ''
   events.forEach(e => {
-    const d       = new Date(e.starts_at)
-    const dateStr = d.toLocaleDateString('de-DE', { weekday:'short', day:'numeric', month:'short' })
-    const timeStr = e.all_day ? 'Ganztägig' : d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' })+' Uhr'
+    const d        = new Date(e.starts_at)
+    const dateLabel = d.toLocaleDateString('de-DE', { weekday:'short', day:'numeric', month:'short' })
+    const timeStr  = e.all_day ? 'Ganztägig' : d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' })+' Uhr'
     const row = document.createElement('div')
     row.className = 'detail-row'
     row.innerHTML = `
       <div>
         <div class="detail-row-main">${escHtml(e.title)}</div>
-        <div class="detail-row-sub">${dateStr}, ${timeStr}</div>
+        <div class="detail-row-sub">${dateLabel}, ${timeStr}</div>
       </div>
       <button class="detail-edit-btn" data-id="${e.id}">Bearbeiten</button>`
     row.querySelector('.detail-edit-btn').addEventListener('click', () => openCalForm(e))
@@ -503,6 +573,23 @@ let _editingCalId = null
 document.getElementById('dash-cal-add-btn').addEventListener('click', () => openCalForm(null))
 document.getElementById('dash-cal-cancel').addEventListener('click', closeCalForm)
 document.getElementById('dash-cal-save').addEventListener('click', saveCal)
+document.getElementById('dash-cal-prev').addEventListener('click', () => {
+  _dashCalDate = new Date(_dashCalDate.getFullYear(), _dashCalDate.getMonth() - 1, 1)
+  _dashSelectedDate = null
+  renderDashMiniCal()
+  renderDashEventList(null)
+})
+document.getElementById('dash-cal-next').addEventListener('click', () => {
+  _dashCalDate = new Date(_dashCalDate.getFullYear(), _dashCalDate.getMonth() + 1, 1)
+  _dashSelectedDate = null
+  renderDashMiniCal()
+  renderDashEventList(null)
+})
+document.getElementById('dash-cal-all-btn').addEventListener('click', () => {
+  _dashSelectedDate = null
+  renderDashMiniCal()
+  renderDashEventList(null)
+})
 dashCalDelete.addEventListener('click', deleteCal)
 
 function openCalForm (event) {

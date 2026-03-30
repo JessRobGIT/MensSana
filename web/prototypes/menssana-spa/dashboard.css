@@ -365,7 +365,101 @@ body {
 .mood-meta-sep { opacity: 0.4; }
 
 /* Detail lists */
-.detail-list { display: flex; flex-direction: column; gap: 8px; }
+.detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+/* ── Mini calendar (dashboard) ──────────────────────────── */
+.dash-mini-cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dmg-nav-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: var(--green);
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.dmg-nav-btn:hover { background: var(--green-pale); }
+
+.dash-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.dmg-header {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  padding: 2px 0;
+}
+
+.dmg-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 1px;
+  border-radius: 5px;
+  cursor: pointer;
+  min-height: 30px;
+  gap: 2px;
+}
+.dmg-cell.other { cursor: default; }
+.dmg-cell:not(.other):hover { background: var(--green-pale); }
+
+.dmg-num {
+  font-size: 0.75rem;
+  line-height: 1;
+}
+.dmg-cell.today .dmg-num {
+  background: var(--green);
+  color: #fff;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dmg-cell.selected { background: var(--green-pale); }
+.dmg-cell.selected .dmg-num { color: var(--green); font-weight: 700; }
+
+.dmg-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--green-mid);
+}
+.dmg-cell.has-events.selected .dmg-dot { background: var(--green); }
+
+.dash-cal-all-btn {
+  background: none;
+  border: none;
+  color: var(--green);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 0 6px 0;
+  text-decoration: underline;
+}
 
 .detail-row {
   display: flex;
