@@ -734,10 +734,10 @@ async function saveMedicationToDB (med) {
   }
 
   if (med.id) {
-    const { error } = await sb.from('medications').update(payload).eq('id', med.id).eq('user_id', currentUser.id)
+    const { error } = await sb.from('medications').update({ ...payload, updated_by: currentUser.id }).eq('id', med.id).eq('user_id', currentUser.id)
     return !error
   } else {
-    const { error } = await sb.from('medications').insert([payload])
+    const { error } = await sb.from('medications').insert([{ ...payload, created_by: currentUser.id }])
     return !error
   }
 }
@@ -1188,18 +1188,18 @@ async function saveCalendarEntryToDB (entry) {
   }
 
   if (entry.id) {
-    let { error } = await sb.from('calendar_events').update(payload).eq('id', entry.id).eq('user_id', currentUser.id)
+    const updatePayload = { ...payload, updated_by: currentUser.id }
+    let { error } = await sb.from('calendar_events').update(updatePayload).eq('id', entry.id).eq('user_id', currentUser.id)
     if (error) {
-      // Retry without frequency in case column is missing
-      const { frequency: _f, ...payloadNoFreq } = payload
+      const { frequency: _f, ...payloadNoFreq } = updatePayload
       ;({ error } = await sb.from('calendar_events').update(payloadNoFreq).eq('id', entry.id).eq('user_id', currentUser.id))
     }
     return !error
   } else {
-    let { error } = await sb.from('calendar_events').insert([payload])
+    const insertPayload = { ...payload, created_by: currentUser.id }
+    let { error } = await sb.from('calendar_events').insert([insertPayload])
     if (error) {
-      // Retry without frequency in case column is missing
-      const { frequency: _f, ...payloadNoFreq } = payload
+      const { frequency: _f, ...payloadNoFreq } = insertPayload
       ;({ error } = await sb.from('calendar_events').insert([payloadNoFreq]))
     }
     return !error

@@ -1,6 +1,6 @@
 # MensSana — Rollen & Berechtigungen (MVP)
 
-**Stand: 2026-03-30**
+**Stand: 2026-04-03**
 
 ---
 
@@ -84,8 +84,11 @@ Rollen werden manuell über den Supabase Table Editor vergeben.
   Später optional: Fotos, Hinweise, Kommunikationsanfragen.
 - **Zuordnung über `caregiver_assignments`** — Caregiver/Family sehen nur Daten
   von Nutzern, denen sie explizit zugewiesen wurden.
-- **Audit-Log** ist für MVP noch nicht implementiert.
-  `created_by` / `updated_by` Felder werden in einer späteren Phase ergänzt.
+- **Audit-Felder** (`created_by`, `updated_by`) sind in `medications` und `calendar_events`
+  implementiert. Werden bei jeder Aktion mit der User-ID des Ausführenden befüllt.
+  Im Dashboard wird ein **P**-Badge angezeigt wenn ein Caregiver einen Eintrag erstellt
+  oder zuletzt bearbeitet hat (blau = erstellt, orange = zuletzt bearbeitet).
+  SQL: `docs/sql/audit-columns.sql`
 
 ---
 

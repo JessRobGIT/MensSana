@@ -84,6 +84,7 @@ function freqLabel (f) {
 
 // ── Auth ──────────────────────────────────────────────────
 let _dashInitialized  = false
+let _caregiverId      = null   // logged-in caregiver's user id
 let _detailUserId     = null   // currently viewed user in detail panel
 let _dashCalEvents    = []     // cached events for mini calendar
 let _dashCalDate      = new Date()
@@ -127,6 +128,7 @@ function showLogin () {
 
 async function initDashboard (user) {
   _dashInitialized = true
+  _caregiverId = user.id
 
   // Load profile and verify role
   const { data: profile, error: profileError } = await sb
@@ -305,12 +307,12 @@ async function showDetail (userId, name) {
       .limit(5),
 
     sb.from('medications')
-      .select('id, name, dosage, time_of_day, frequency, notes')
+      .select('id, name, dosage, time_of_day, frequency, notes, created_by, updated_by')
       .eq('user_id', userId)
       .order('time_of_day', { ascending: true }),
 
     sb.from('calendar_events')
-      .select('id, title, starts_at, all_day, description, frequency, ends_at')
+      .select('id, title, starts_at, all_day, description, frequency, ends_at, created_by, updated_by')
       .eq('user_id', userId)
       .gte('starts_at', (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString() })())
       .order('starts_at', { ascending: true }),
@@ -392,9 +394,11 @@ function renderMedications (meds) {
   meds.forEach(m => {
     const row = document.createElement('div')
     row.className = 'detail-row'
+    const medByCaregiver = m.created_by && m.created_by !== _detailUserId
+    const medUpdated     = m.updated_by && m.updated_by !== _detailUserId
     row.innerHTML = `
       <div>
-        <div class="detail-row-main">${escHtml(m.name)}${m.dosage ? ' · '+escHtml(m.dosage) : ''}</div>
+        <div class="detail-row-main">${escHtml(m.name)}${m.dosage ? ' · '+escHtml(m.dosage) : ''}${medByCaregiver ? ' <span class="audit-badge">P</span>' : medUpdated ? ' <span class="audit-badge audit-badge-edit">P</span>' : ''}</div>
         <div class="detail-row-sub">${freqLabel(m.frequency)}${m.time_of_day ? ' · '+String(m.time_of_day).slice(0,5)+' Uhr' : ''}</div>
       </div>
       <button class="detail-edit-btn" data-id="${m.id}">Bearbeiten</button>`
@@ -480,11 +484,16 @@ function renderDashEventList (dateStr) {
     const dateLabel = d.toLocaleDateString('de-DE', { weekday:'short', day:'numeric', month:'short' })
     const timeStr  = e.all_day ? 'Ganztägig' : d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' })+' Uhr'
     const freqStr  = e.frequency && e.frequency !== 'once' ? ' · ' + freqLabel(e.frequency) : ''
+    const evtByCaregiver = e.created_by && e.created_by !== _detailUserId
+    const evtUpdated     = e.updated_by && e.updated_by !== _detailUserId
+    const auditBadge = evtByCaregiver
+      ? ' <span class="audit-badge">P</span>'
+      : evtUpdated ? ' <span class="audit-badge audit-badge-edit">P</span>' : ''
     const row = document.createElement('div')
     row.className = 'detail-row'
     row.innerHTML = `
       <div>
-        <div class="detail-row-main">${escHtml(e.title)}</div>
+        <div class="detail-row-main">${escHtml(e.title)}${auditBadge}</div>
         <div class="detail-row-sub">${dateLabel}, ${timeStr}${freqStr}</div>
       </div>
       <button class="detail-edit-btn" data-id="${e.id}">Bearbeiten</button>`
@@ -543,9 +552,9 @@ async function saveMed () {
 
   let error
   if (_editingMedId) {
-    ;({ error } = await sb.from('medications').update(payload).eq('id', _editingMedId).eq('user_id', _detailUserId))
+    ;({ error } = await sb.from('medications').update({ ...payload, updated_by: _caregiverId }).eq('id', _editingMedId).eq('user_id', _detailUserId))
   } else {
-    ;({ error } = await sb.from('medications').insert([payload]))
+    ;({ error } = await sb.from('medications').insert([{ ...payload, created_by: _caregiverId }]))
   }
 
   if (error) { alert('Speichern fehlgeschlagen: ' + error.message); return }
@@ -645,9 +654,9 @@ async function saveCal () {
 
   let error
   if (_editingCalId) {
-    ;({ error } = await sb.from('calendar_events').update(payload).eq('id', _editingCalId).eq('user_id', _detailUserId))
+    ;({ error } = await sb.from('calendar_events').update({ ...payload, updated_by: _caregiverId }).eq('id', _editingCalId).eq('user_id', _detailUserId))
   } else {
-    ;({ error } = await sb.from('calendar_events').insert([payload]))
+    ;({ error } = await sb.from('calendar_events').insert([{ ...payload, created_by: _caregiverId }]))
   }
 
   if (error) { alert('Speichern fehlgeschlagen: ' + error.message); return }
