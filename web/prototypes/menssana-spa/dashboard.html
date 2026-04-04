@@ -41,6 +41,7 @@
       <div class="dash-header-right">
         <span id="dash-user"></span>
         <span id="dash-role-badge" class="dash-role-badge hidden"></span>
+        <button class="btn-outline" id="dash-settings-btn" title="Einstellungen">⚙</button>
         <button class="btn-outline" id="logout-btn">Abmelden</button>
       </div>
     </header>
@@ -109,6 +110,47 @@
       </section>
 
     </main>
+  </div>
+
+  <!-- Einstellungen-Overlay -->
+  <div id="dash-settings-overlay" class="dash-form-overlay hidden" role="dialog" aria-modal="true">
+    <div class="dash-form-card dash-settings-card">
+      <h3>Mein Konto</h3>
+      <div class="settings-row">
+        <span class="settings-label">E-Mail</span>
+        <span id="dash-settings-email" class="settings-value"></span>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">Rolle</span>
+        <span id="dash-settings-role" class="settings-value"></span>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">Name</span>
+        <input id="dash-settings-name" type="text" class="settings-input"
+               placeholder="Ihr Name" autocomplete="name" />
+      </div>
+      <button class="btn btn-primary" id="dash-settings-name-save">Name speichern</button>
+      <p class="settings-status" id="dash-settings-name-status"></p>
+
+      <hr class="settings-divider" />
+      <h3>Passwort ändern</h3>
+      <div class="form-group">
+        <label for="dash-settings-pw-new">Neues Passwort</label>
+        <input id="dash-settings-pw-new" type="password"
+               placeholder="Mindestens 6 Zeichen" autocomplete="new-password" />
+      </div>
+      <div class="form-group">
+        <label for="dash-settings-pw-confirm">Passwort bestätigen</label>
+        <input id="dash-settings-pw-confirm" type="password"
+               placeholder="Wiederholen" autocomplete="new-password" />
+      </div>
+      <button class="btn btn-primary" id="dash-settings-pw-save">Passwort ändern</button>
+      <p class="settings-status" id="dash-settings-pw-status"></p>
+
+      <div class="dash-form-actions" style="margin-top:16px">
+        <button class="btn btn-secondary" id="dash-settings-close">Schließen</button>
+      </div>
+    </div>
   </div>
 
   <!-- Medikament-Formular -->

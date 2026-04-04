@@ -18,6 +18,18 @@ const dashTodoList      = document.getElementById('dash-todo-list')
 const dashTodoSave      = document.getElementById('dash-todo-save')
 const dashTodoCancel    = document.getElementById('dash-todo-cancel')
 const dashTodoArchive   = document.getElementById('dash-todo-archive')
+const dashSettingsOverlay   = document.getElementById('dash-settings-overlay')
+const dashSettingsBtn       = document.getElementById('dash-settings-btn')
+const dashSettingsClose     = document.getElementById('dash-settings-close')
+const dashSettingsEmail     = document.getElementById('dash-settings-email')
+const dashSettingsRole      = document.getElementById('dash-settings-role')
+const dashSettingsName      = document.getElementById('dash-settings-name')
+const dashSettingsNameSave  = document.getElementById('dash-settings-name-save')
+const dashSettingsNameStatus= document.getElementById('dash-settings-name-status')
+const dashSettingsPwNew     = document.getElementById('dash-settings-pw-new')
+const dashSettingsPwConfirm = document.getElementById('dash-settings-pw-confirm')
+const dashSettingsPwSave    = document.getElementById('dash-settings-pw-save')
+const dashSettingsPwStatus  = document.getElementById('dash-settings-pw-status')
 const loginView    = document.getElementById('login-view')
 const dashView     = document.getElementById('dashboard-view')
 const loginForm    = document.getElementById('login-form')
@@ -130,6 +142,56 @@ logoutBtn.addEventListener('click', async () => {
   await sb.auth.signOut()
 })
 
+// ── Settings ──────────────────────────────────────────────
+
+let _dashCurrentUser = null
+
+dashSettingsBtn.addEventListener('click', () => {
+  if (!_dashCurrentUser) return
+  dashSettingsEmail.textContent = _dashCurrentUser.email
+  const ROLE_LABELS = { caregiver: 'Betreuungsperson', family: 'Familie' }
+  dashSettingsRole.textContent  = ROLE_LABELS[_dashCurrentUser._role] ?? _dashCurrentUser._role ?? '—'
+  dashSettingsName.value        = _dashCurrentUser.user_metadata?.display_name || ''
+  dashSettingsNameStatus.textContent = ''
+  dashSettingsPwNew.value     = ''
+  dashSettingsPwConfirm.value = ''
+  dashSettingsPwStatus.textContent = ''
+  dashSettingsOverlay.classList.remove('hidden')
+})
+
+dashSettingsClose.addEventListener('click', () => {
+  dashSettingsOverlay.classList.add('hidden')
+})
+
+dashSettingsNameSave.addEventListener('click', async () => {
+  const name = dashSettingsName.value.trim()
+  if (!name) { dashSettingsNameStatus.textContent = 'Bitte einen Namen eingeben.'; return }
+  const { error } = await sb.auth.updateUser({ data: { display_name: name } })
+  if (error) {
+    dashSettingsNameStatus.textContent = 'Fehler: ' + error.message
+  } else {
+    await sb.from('profiles').update({ display_name: name }).eq('id', _dashCurrentUser.id)
+    dashUser.textContent = name
+    dashSettingsNameStatus.textContent = '✓ Name gespeichert.'
+  }
+})
+
+dashSettingsPwSave.addEventListener('click', async () => {
+  const pw  = dashSettingsPwNew.value
+  const pw2 = dashSettingsPwConfirm.value
+  dashSettingsPwStatus.textContent = ''
+  if (pw.length < 6) { dashSettingsPwStatus.textContent = 'Mindestens 6 Zeichen.'; return }
+  if (pw !== pw2)    { dashSettingsPwStatus.textContent = 'Passwörter stimmen nicht überein.'; return }
+  const { error } = await sb.auth.updateUser({ password: pw })
+  if (error) {
+    dashSettingsPwStatus.textContent = 'Fehler: ' + error.message
+  } else {
+    dashSettingsPwNew.value     = ''
+    dashSettingsPwConfirm.value = ''
+    dashSettingsPwStatus.textContent = '✓ Passwort geändert.'
+  }
+})
+
 function showLogin () {
   loginView.classList.remove('hidden')
   dashView.classList.add('hidden')
@@ -137,7 +199,8 @@ function showLogin () {
 
 async function initDashboard (user) {
   _dashInitialized = true
-  _caregiverId = user.id
+  _caregiverId     = user.id
+  _dashCurrentUser = user
 
   // Load profile and verify role
   const { data: profile, error: profileError } = await sb
@@ -156,6 +219,7 @@ async function initDashboard (user) {
     return
   }
 
+  _dashCurrentUser._role = profile.role
   const ROLE_LABELS = { caregiver: 'Pflegeperson', family: 'Familie' }
   const name = profile.display_name || profile.full_name || user.email
   dashUser.textContent = name

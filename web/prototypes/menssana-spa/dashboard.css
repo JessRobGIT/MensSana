@@ -588,3 +588,80 @@ body {
 
 .dash-todo-strike { text-decoration: line-through; color: var(--muted); }
 .dash-todo-overdue { color: var(--danger) !important; font-weight: 600; }
+
+/* ── SETTINGS ───────────────────────────────────────────── */
+
+.dash-settings-card {
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dash-settings-card h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--green);
+  margin: 0;
+}
+
+.settings-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-label {
+  width: 70px;
+  font-size: 0.88rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.settings-value {
+  font-weight: 500;
+}
+
+.settings-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: #f9f9f9;
+  color: var(--text);
+}
+
+.settings-input:focus {
+  outline: none;
+  border-color: var(--green);
+  background: #fff;
+}
+
+.settings-status {
+  font-size: 0.85rem;
+  color: var(--green);
+  min-height: 1.1em;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: var(--text);
+  font-family: inherit;
+}
+
+.btn-outline:hover {
+  background: var(--bg);
+}
