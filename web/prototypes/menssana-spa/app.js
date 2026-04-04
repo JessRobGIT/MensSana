@@ -1455,7 +1455,7 @@ async function loadTodoContext () {
   if (!data) return []
   return data.map(i => ({
     title:     i.title,
-    list_name: (i.todo_lists as any)?.name ?? 'Aufgaben',
+    list_name: i.todo_lists?.name ?? 'Aufgaben',
     due_at:    i.due_at ? isoDate(new Date(i.due_at)) : undefined,
   }))
 }
