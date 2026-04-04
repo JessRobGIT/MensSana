@@ -9,6 +9,15 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 })
 
 // ── DOM refs ──────────────────────────────────────────────
+const dashTodoOverlay   = document.getElementById('dash-todo-overlay')
+const dashTodoFormTitle = document.getElementById('dash-todo-form-title')
+const dashTodoTitle     = document.getElementById('dash-todo-title')
+const dashTodoNotes     = document.getElementById('dash-todo-notes')
+const dashTodoDue       = document.getElementById('dash-todo-due')
+const dashTodoList      = document.getElementById('dash-todo-list')
+const dashTodoSave      = document.getElementById('dash-todo-save')
+const dashTodoCancel    = document.getElementById('dash-todo-cancel')
+const dashTodoArchive   = document.getElementById('dash-todo-archive')
 const loginView    = document.getElementById('login-view')
 const dashView     = document.getElementById('dashboard-view')
 const loginForm    = document.getElementById('login-form')
@@ -322,6 +331,7 @@ async function showDetail (userId, name) {
   renderConversations(convRes.data ?? [])
   renderMedications(medsRes.data ?? [])
   renderDashCalendar(eventsRes.data ?? [])
+  await loadAndRenderDashTodos(userId)
 }
 
 function renderMoodChart (entries) {
@@ -670,4 +680,178 @@ async function deleteCal () {
   await sb.from('calendar_events').delete().eq('id', _editingCalId).eq('user_id', _detailUserId)
   closeCalForm()
   showDetail(_detailUserId, detailName.textContent)
+}
+
+// ── To-Do (Dashboard) ──────────────────────────────────────
+
+let _dashTodoLists      = []
+let _dashTodoItems      = []
+let _dashActiveListId   = null
+let _editingTodoId      = null
+let _dashShowDone       = false
+
+document.getElementById('dash-todo-add-btn').addEventListener('click', () => openDashTodoForm(null))
+dashTodoSave.addEventListener('click',    saveDashTodo)
+dashTodoCancel.addEventListener('click',  closeDashTodoForm)
+dashTodoArchive.addEventListener('click', archiveDashTodo)
+
+async function loadAndRenderDashTodos (userId) {
+  const { data: lists } = await sb.from('todo_lists')
+    .select('id, name')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+  _dashTodoLists = lists ?? []
+  _dashActiveListId = _dashTodoLists[0]?.id ?? null
+  _dashShowDone = false
+  renderDashTodoListsBar()
+  await loadDashTodoItems()
+}
+
+function renderDashTodoListsBar () {
+  const bar = document.getElementById('dash-todo-lists-bar')
+  bar.innerHTML = ''
+
+  if (!_dashTodoLists.length) return
+
+  _dashTodoLists.forEach(list => {
+    const btn = document.createElement('button')
+    btn.className = 'dash-todo-tab' + (list.id === _dashActiveListId ? ' active' : '')
+    btn.textContent = list.name
+    btn.addEventListener('click', async () => {
+      _dashActiveListId = list.id
+      renderDashTodoListsBar()
+      await loadDashTodoItems()
+    })
+    bar.appendChild(btn)
+  })
+
+  const toggle = document.createElement('button')
+  toggle.className = 'dash-todo-done-toggle' + (_dashShowDone ? ' active' : '')
+  toggle.textContent = _dashShowDone ? '✓ Ausblenden' : '✓ Erledigt'
+  toggle.addEventListener('click', () => {
+    _dashShowDone = !_dashShowDone
+    renderDashTodoListsBar()
+    renderDashTodoItems()
+  })
+  bar.appendChild(toggle)
+}
+
+async function loadDashTodoItems () {
+  const el = document.getElementById('dash-todo-items')
+  if (!_dashActiveListId) { el.innerHTML = '<span class="detail-empty">Keine Listen vorhanden.</span>'; return }
+  const { data } = await sb.from('todo_items')
+    .select('id, title, notes, status, due_at, created_by')
+    .eq('list_id', _dashActiveListId)
+    .neq('status', 'archived')
+    .order('created_at', { ascending: true })
+  _dashTodoItems = data ?? []
+  renderDashTodoItems()
+}
+
+function renderDashTodoItems () {
+  const el = document.getElementById('dash-todo-items')
+  const items = _dashShowDone
+    ? _dashTodoItems
+    : _dashTodoItems.filter(i => i.status !== 'done')
+
+  if (!items.length) {
+    el.innerHTML = '<span class="detail-empty">Keine offenen Aufgaben.</span>'
+    return
+  }
+
+  el.innerHTML = ''
+  items.forEach(item => {
+    const row = document.createElement('div')
+    row.className = 'detail-row' + (item.status === 'done' ? ' todo-done' : '')
+
+    const dueStr = item.due_at
+      ? new Date(item.due_at).toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })
+      : ''
+    const overdue = item.due_at && item.status !== 'done' && new Date(item.due_at) < new Date()
+    const byCaregiver = item.created_by && item.created_by !== _detailUserId
+
+    row.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+        <button class="dash-todo-check" data-id="${item.id}">${item.status === 'done' ? '✓' : ''}</button>
+        <div style="flex:1;min-width:0">
+          <div class="detail-row-main${item.status === 'done' ? ' dash-todo-strike' : ''}">
+            ${escHtml(item.title)}${byCaregiver ? ' <span class="audit-badge">P</span>' : ''}
+          </div>
+          ${dueStr ? `<div class="detail-row-sub${overdue ? ' dash-todo-overdue' : ''}">${dueStr}</div>` : ''}
+        </div>
+      </div>
+      <button class="detail-edit-btn">Bearbeiten</button>`
+
+    row.querySelector('.dash-todo-check').addEventListener('click', () => toggleDashTodo(item))
+    row.querySelector('.detail-edit-btn').addEventListener('click', () => openDashTodoForm(item))
+    el.appendChild(row)
+  })
+}
+
+async function toggleDashTodo (item) {
+  const newStatus = item.status === 'done' ? 'open' : 'done'
+  const patch = { status: newStatus, completed_at: newStatus === 'done' ? new Date().toISOString() : null }
+  const { error } = await sb.from('todo_items').update(patch)
+    .eq('id', item.id).eq('user_id', _detailUserId)
+  if (error) return
+  item.status = newStatus
+  renderDashTodoItems()
+}
+
+function openDashTodoForm (item) {
+  _editingTodoId = item?.id ?? null
+  dashTodoFormTitle.textContent = item ? 'Aufgabe bearbeiten' : 'Aufgabe hinzufügen'
+  dashTodoTitle.value = item?.title ?? ''
+  dashTodoNotes.value = item?.notes ?? ''
+  dashTodoDue.value   = item?.due_at ? isoDate(new Date(item.due_at)) : ''
+  dashTodoList.innerHTML = _dashTodoLists.map(l =>
+    `<option value="${l.id}"${l.id === _dashActiveListId ? ' selected' : ''}>${escHtml(l.name)}</option>`
+  ).join('')
+  dashTodoArchive.style.display = item ? '' : 'none'
+  dashTodoOverlay.classList.remove('hidden')
+  dashTodoTitle.focus()
+}
+
+function closeDashTodoForm () {
+  dashTodoOverlay.classList.add('hidden')
+  _editingTodoId = null
+}
+
+async function saveDashTodo () {
+  const title = dashTodoTitle.value.trim()
+  if (!title || !_detailUserId) { dashTodoTitle.focus(); return }
+
+  const listId  = dashTodoList.value || _dashActiveListId
+  const payload = {
+    title,
+    notes:   dashTodoNotes.value.trim() || null,
+    due_at:  dashTodoDue.value ? `${dashTodoDue.value}T12:00:00Z` : null,
+    list_id: listId,
+    user_id: _detailUserId,
+  }
+
+  let error
+  if (_editingTodoId) {
+    ;({ error } = await sb.from('todo_items')
+      .update({ ...payload, updated_by: _caregiverId })
+      .eq('id', _editingTodoId).eq('user_id', _detailUserId))
+  } else {
+    ;({ error } = await sb.from('todo_items')
+      .insert([{ ...payload, created_by: _caregiverId }]))
+  }
+
+  if (error) { alert('Speichern fehlgeschlagen: ' + error.message); return }
+  if (listId !== _dashActiveListId) _dashActiveListId = listId
+  closeDashTodoForm()
+  renderDashTodoListsBar()
+  await loadDashTodoItems()
+}
+
+async function archiveDashTodo () {
+  if (!_editingTodoId || !_detailUserId) return
+  const { error } = await sb.from('todo_items').update({ status: 'archived' })
+    .eq('id', _editingTodoId).eq('user_id', _detailUserId)
+  if (error) { alert('Archivieren fehlgeschlagen.'); return }
+  closeDashTodoForm()
+  await loadDashTodoItems()
 }

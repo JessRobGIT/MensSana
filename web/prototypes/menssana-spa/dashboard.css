@@ -227,6 +227,10 @@ body {
   .detail-grid { grid-template-columns: 1fr; }
 }
 
+.detail-card-full {
+  grid-column: 1 / -1;
+}
+
 .detail-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -518,3 +522,69 @@ body {
 .mood-badge.m3 { background: #eee; color: var(--muted); }
 .mood-badge.m2 { background: #fdecd0; color: var(--warn); }
 .mood-badge.m1 { background: #fdecea; color: var(--danger); }
+
+/* ── To-Do (Dashboard) ──────────────────────────────────── */
+.dash-todo-lists-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.dash-todo-tab {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 4px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.dash-todo-tab.active,
+.dash-todo-tab:hover {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.dash-todo-done-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  cursor: pointer;
+  margin-left: auto;
+}
+.dash-todo-done-toggle.active {
+  color: var(--green);
+  border-color: var(--green-mid);
+}
+
+.dash-todo-check {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  color: var(--green);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+.todo-done .dash-todo-check {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.dash-todo-strike { text-decoration: line-through; color: var(--muted); }
+.dash-todo-overdue { color: var(--danger) !important; font-weight: 600; }

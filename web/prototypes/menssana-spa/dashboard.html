@@ -97,6 +97,14 @@
             <div id="events-list" class="detail-list"></div>
           </div>
 
+          <div class="detail-card detail-card-full">
+            <h3>Aufgaben
+              <button class="detail-add-btn" id="dash-todo-add-btn">+ Aufgabe</button>
+            </h3>
+            <div id="dash-todo-lists-bar" class="dash-todo-lists-bar"></div>
+            <div id="dash-todo-items" class="detail-list"></div>
+          </div>
+
         </div>
       </section>
 
@@ -177,6 +185,34 @@
         <button class="btn btn-primary" id="dash-cal-save">Speichern</button>
         <button class="btn btn-secondary" id="dash-cal-cancel">Abbrechen</button>
         <button class="btn btn-danger" id="dash-cal-delete" style="display:none">Löschen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Aufgabe Formular -->
+  <div id="dash-todo-overlay" class="dash-form-overlay hidden" role="dialog" aria-modal="true">
+    <div class="dash-form-card">
+      <h3 id="dash-todo-form-title">Aufgabe hinzufügen</h3>
+      <div class="form-group">
+        <label for="dash-todo-title">Titel *</label>
+        <input id="dash-todo-title" type="text" placeholder="z.B. Arzt anrufen" />
+      </div>
+      <div class="form-group">
+        <label for="dash-todo-notes">Notiz</label>
+        <textarea id="dash-todo-notes" rows="2" placeholder="z.B. wegen Blutdruck"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="dash-todo-due">Fällig am</label>
+        <input id="dash-todo-due" type="date" />
+      </div>
+      <div class="form-group">
+        <label for="dash-todo-list">Liste</label>
+        <select id="dash-todo-list"></select>
+      </div>
+      <div class="dash-form-actions">
+        <button class="btn btn-primary"   id="dash-todo-save">Speichern</button>
+        <button class="btn btn-secondary" id="dash-todo-cancel">Abbrechen</button>
+        <button class="btn btn-danger"    id="dash-todo-archive" style="display:none">Archivieren</button>
       </div>
     </div>
   </div>
