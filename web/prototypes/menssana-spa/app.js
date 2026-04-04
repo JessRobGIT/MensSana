@@ -35,6 +35,23 @@ const historyPanel    = document.getElementById('history-panel')
 const historyToggle   = document.getElementById('history-toggle-btn')
 const convList        = document.getElementById('conversation-list')
 const medsBtn        = document.getElementById('meds-btn')
+const todoBtn        = document.getElementById('todo-btn')
+const todoSection    = document.getElementById('todo-section')
+const todoBack       = document.getElementById('todo-back')
+const todoAddListBtn = document.getElementById('todo-add-list-btn')
+const todoListsBar   = document.getElementById('todo-lists-bar')
+const todoItemsList  = document.getElementById('todo-items-list')
+const todoNewTitle   = document.getElementById('todo-new-title')
+const todoAddItemBtn = document.getElementById('todo-add-item-btn')
+const todoFormOverlay      = document.getElementById('todo-form-overlay')
+const todoFormTitleEl      = document.getElementById('todo-form-title')
+const todoFormTitleInput   = document.getElementById('todo-form-title-input')
+const todoFormNotes        = document.getElementById('todo-form-notes')
+const todoFormDue          = document.getElementById('todo-form-due')
+const todoFormList         = document.getElementById('todo-form-list')
+const todoFormSave         = document.getElementById('todo-form-save')
+const todoFormCancel       = document.getElementById('todo-form-cancel')
+const todoFormArchive      = document.getElementById('todo-form-archive')
 const medsSection    = document.getElementById('meds-section')
 const chatSection    = document.getElementById('chat-section')
 const medsBack       = document.getElementById('meds-back')
@@ -568,6 +585,7 @@ let _activeSection = 'chat'
 function showSection (name) {
   _activeSection = name
   chatSection.classList.toggle('hidden', name !== 'chat')
+  todoSection.classList.toggle('hidden', name !== 'todo')
   medsSection.classList.toggle('hidden', name !== 'meds')
   calSection.classList.toggle('hidden', name !== 'calendar')
 }
@@ -1209,6 +1227,218 @@ async function saveCalendarEntryToDB (entry) {
 async function deleteCalendarEntryFromDB (id) {
   const { error } = await sb.from('calendar_events').delete().eq('id', id).eq('user_id', currentUser.id)
   return !error
+}
+
+// ── To-Do ─────────────────────────────────────────────────
+
+let _todoLists      = []
+let _todoItems      = []
+let _activeListId   = null
+let _editingTodoId  = null
+let _showDoneItems  = false
+
+todoBtn.addEventListener('click', async () => {
+  showSection('todo')
+  await loadAndRenderTodos()
+})
+todoBack.addEventListener('click', () => showSection('chat'))
+
+todoAddListBtn.addEventListener('click', async () => {
+  const name = prompt('Name der neuen Liste:')
+  if (!name?.trim()) return
+  const { data, error } = await sb.from('todo_lists')
+    .insert([{ user_id: currentUser.id, name: name.trim() }])
+    .select('id, name').single()
+  if (error || !data) { showBanner('Liste konnte nicht erstellt werden.', true); return }
+  _todoLists.push(data)
+  _activeListId = data.id
+  renderTodoLists()
+  await loadAndRenderTodoItems()
+})
+
+todoNewTitle.addEventListener('input', () => {
+  todoAddItemBtn.disabled = !todoNewTitle.value.trim()
+})
+todoNewTitle.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && todoNewTitle.value.trim()) addTodoItem()
+})
+todoAddItemBtn.addEventListener('click', addTodoItem)
+
+todoFormSave.addEventListener('click', saveTodoItemForm)
+todoFormCancel.addEventListener('click', hideTodoForm)
+todoFormArchive.addEventListener('click', archiveTodoItem)
+
+async function loadAndRenderTodos () {
+  const { data } = await sb.from('todo_lists')
+    .select('id, name')
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: true })
+  _todoLists = data ?? []
+
+  // Auto-create default list on first use
+  if (!_todoLists.length) {
+    const { data: newList } = await sb.from('todo_lists')
+      .insert([{ user_id: currentUser.id, name: 'Aufgaben' }])
+      .select('id, name').single()
+    if (newList) _todoLists = [newList]
+  }
+
+  if (!_activeListId || !_todoLists.find(l => l.id === _activeListId)) {
+    _activeListId = _todoLists[0]?.id ?? null
+  }
+  renderTodoLists()
+  await loadAndRenderTodoItems()
+}
+
+function renderTodoLists () {
+  todoListsBar.innerHTML = ''
+  _todoLists.forEach(list => {
+    const btn = document.createElement('button')
+    btn.className = 'todo-list-tab' + (list.id === _activeListId ? ' active' : '')
+    btn.textContent = list.name
+    btn.addEventListener('click', async () => {
+      _activeListId = list.id
+      renderTodoLists()
+      await loadAndRenderTodoItems()
+    })
+    todoListsBar.appendChild(btn)
+  })
+
+  // Done-toggle
+  const toggle = document.createElement('button')
+  toggle.className = 'todo-done-toggle' + (_showDoneItems ? ' active' : '')
+  toggle.textContent = _showDoneItems ? '✓ Erledigt ausblenden' : '✓ Erledigt anzeigen'
+  toggle.addEventListener('click', () => {
+    _showDoneItems = !_showDoneItems
+    renderTodoLists()
+    renderTodoItems()
+  })
+  todoListsBar.appendChild(toggle)
+}
+
+async function loadAndRenderTodoItems () {
+  if (!_activeListId) { todoItemsList.innerHTML = ''; return }
+  const { data } = await sb.from('todo_items')
+    .select('id, title, notes, status, due_at, created_by')
+    .eq('list_id', _activeListId)
+    .neq('status', 'archived')
+    .order('created_at', { ascending: true })
+  _todoItems = data ?? []
+  renderTodoItems()
+}
+
+function renderTodoItems () {
+  const items = _showDoneItems
+    ? _todoItems
+    : _todoItems.filter(i => i.status !== 'done')
+
+  if (!items.length) {
+    todoItemsList.innerHTML = '<p class="todo-empty">Keine offenen Aufgaben.</p>'
+    return
+  }
+
+  todoItemsList.innerHTML = ''
+  items.forEach(item => {
+    const row = document.createElement('div')
+    row.className = 'todo-item' + (item.status === 'done' ? ' done' : '')
+
+    const dueStr = item.due_at
+      ? new Date(item.due_at).toLocaleDateString('de-DE', { day:'numeric', month:'short' })
+      : ''
+    const overdue = item.due_at && item.status !== 'done' && new Date(item.due_at) < new Date()
+
+    row.innerHTML = `
+      <button class="todo-check" data-id="${item.id}" aria-label="${item.status === 'done' ? 'Als offen markieren' : 'Als erledigt markieren'}">
+        ${item.status === 'done' ? '✓' : ''}
+      </button>
+      <div class="todo-item-body">
+        <span class="todo-item-title">${escapeHtml(item.title)}</span>
+        ${dueStr ? `<span class="todo-due${overdue ? ' overdue' : ''}">${dueStr}</span>` : ''}
+      </div>
+      <button class="todo-edit-btn" data-id="${item.id}" aria-label="Bearbeiten">…</button>`
+
+    row.querySelector('.todo-check').addEventListener('click', () => toggleTodoItem(item))
+    row.querySelector('.todo-edit-btn').addEventListener('click', () => showTodoItemForm(item))
+    todoItemsList.appendChild(row)
+  })
+}
+
+async function addTodoItem () {
+  const title = todoNewTitle.value.trim()
+  if (!title || !_activeListId) return
+  const { data, error } = await sb.from('todo_items')
+    .insert([{
+      list_id:    _activeListId,
+      user_id:    currentUser.id,
+      title,
+      created_by: currentUser.id,
+    }])
+    .select('id, title, notes, status, due_at, created_by').single()
+  if (error || !data) { showBanner('Aufgabe konnte nicht gespeichert werden.', true); return }
+  todoNewTitle.value = ''
+  todoAddItemBtn.disabled = true
+  _todoItems.push(data)
+  renderTodoItems()
+}
+
+async function toggleTodoItem (item) {
+  const newStatus = item.status === 'done' ? 'open' : 'done'
+  const patch = { status: newStatus }
+  if (newStatus === 'done') patch.completed_at = new Date().toISOString()
+  else patch.completed_at = null
+  const { error } = await sb.from('todo_items').update(patch)
+    .eq('id', item.id).eq('user_id', currentUser.id)
+  if (error) return
+  item.status = newStatus
+  renderTodoItems()
+}
+
+function showTodoItemForm (item) {
+  _editingTodoId = item.id
+  todoFormTitleEl.textContent = 'Aufgabe bearbeiten'
+  todoFormTitleInput.value = item.title
+  todoFormNotes.value = item.notes ?? ''
+  todoFormDue.value = item.due_at ? isoDate(new Date(item.due_at)) : ''
+  // Populate list selector
+  todoFormList.innerHTML = _todoLists.map(l =>
+    `<option value="${l.id}"${l.id === _activeListId ? ' selected' : ''}>${escapeHtml(l.name)}</option>`
+  ).join('')
+  todoFormArchive.style.display = ''
+  todoFormOverlay.classList.remove('hidden')
+  todoFormTitleInput.focus()
+}
+
+function hideTodoForm () {
+  todoFormOverlay.classList.add('hidden')
+  _editingTodoId = null
+}
+
+async function saveTodoItemForm () {
+  const title = todoFormTitleInput.value.trim()
+  if (!title) { todoFormTitleInput.focus(); return }
+  const newListId = todoFormList.value
+  const payload = {
+    title,
+    notes:  todoFormNotes.value.trim() || null,
+    due_at: todoFormDue.value ? `${todoFormDue.value}T12:00:00Z` : null,
+    list_id: newListId,
+  }
+  const { error } = await sb.from('todo_items').update(payload)
+    .eq('id', _editingTodoId).eq('user_id', currentUser.id)
+  if (error) { showBanner('Speichern fehlgeschlagen.', true); return }
+  hideTodoForm()
+  // Reload — item may have moved to a different list
+  if (newListId !== _activeListId) _activeListId = newListId
+  await loadAndRenderTodoItems()
+}
+
+async function archiveTodoItem () {
+  if (!_editingTodoId) return
+  const { error } = await sb.from('todo_items').update({ status: 'archived' })
+    .eq('id', _editingTodoId).eq('user_id', currentUser.id)
+  if (error) { showBanner('Archivieren fehlgeschlagen.', true); return }
+  hideTodoForm()
+  await loadAndRenderTodoItems()
 }
 
 // ── Mood ──────────────────────────────────────────────────

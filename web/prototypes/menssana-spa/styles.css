@@ -520,6 +520,8 @@ html, body {
 }
 
 #meds-section.hidden { display: none; }
+#todo-section { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+#todo-section.hidden { display: none; }
 #chat-section.hidden { display: none; }
 #chat-section { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 
@@ -1264,4 +1266,193 @@ html, body {
     overflow-x: auto;
     grid-template-columns: repeat(7, minmax(80px, 1fr));
   }
+}
+
+/* ── To-Do ────────────────────────────────────────────────── */
+
+.todo-lists-bar {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 0;
+  overflow-x: auto;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+
+.todo-list-tab {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.todo-list-tab.active,
+.todo-list-tab:hover {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.todo-done-toggle {
+  background: none;
+  border: 2px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.todo-done-toggle.active {
+  border-color: var(--green-light);
+  color: var(--green);
+}
+
+.todo-items-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.todo-empty {
+  color: var(--text-muted);
+  font-size: 1rem;
+  padding: 24px 0;
+  text-align: center;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  transition: opacity 0.2s;
+}
+.todo-item.done {
+  opacity: 0.55;
+}
+
+.todo-check {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  color: var(--green);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+.todo-item.done .todo-check {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+.todo-check:hover {
+  border-color: var(--green);
+}
+
+.todo-item-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.todo-item-title {
+  font-size: 1rem;
+  color: var(--text);
+}
+.todo-item.done .todo-item-title {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.todo-due {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.todo-due.overdue {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.todo-edit-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.todo-edit-btn:hover {
+  background: var(--green-pale);
+  color: var(--green);
+}
+
+.todo-input-bar {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.todo-input-bar input {
+  flex: 1;
+  padding: 12px 14px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+}
+.todo-input-bar input:focus {
+  outline: none;
+  border-color: var(--green);
+  background: var(--surface);
+}
+
+.todo-input-bar button {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: var(--green);
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 300;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.todo-input-bar button:disabled {
+  background: var(--border);
+  cursor: default;
+}
+.todo-input-bar button:not(:disabled):hover {
+  background: var(--green-light);
 }
