@@ -1460,11 +1460,11 @@ async function loadTodoContext () {
   }))
 }
 
-async function handleTodoAction (action: { type: string; list_name: string; title: string }) {
+async function handleTodoAction (action) {
   if (!currentUser || action.type !== 'add') return
 
   // Find or create the list
-  let listId: string | null = null
+  let listId = null
   const { data: lists } = await sb.from('todo_lists')
     .select('id, name').eq('user_id', currentUser.id)
   const match = lists?.find(l => l.name.toLowerCase() === action.list_name.toLowerCase())
