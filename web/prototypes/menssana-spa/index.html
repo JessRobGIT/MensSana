@@ -68,6 +68,7 @@
         <button class="btn-icon" id="todo-btn">Aufgaben</button>
         <button class="btn-icon" id="meds-btn">Medikamente</button>
         <button class="btn-icon" id="cal-btn">Kalender</button>
+        <button class="btn-icon" id="settings-btn" title="Einstellungen">⚙</button>
         <button class="btn-icon" id="logout-btn">
           Abmelden
         </button>
@@ -102,6 +103,49 @@
         </div>
 
         <!-- ── TO-DO ──────────────────────────────────── -->
+        <!-- ── SETTINGS ──────────────────────────────────── -->
+        <div id="settings-section" class="hidden">
+          <div class="meds-toolbar">
+            <button class="btn-icon" id="settings-back">← Chat</button>
+            <h2>Mein Konto</h2>
+          </div>
+          <div class="settings-body">
+            <div class="settings-card">
+              <h3>Meine Daten</h3>
+              <div class="settings-row">
+                <span class="settings-label">E-Mail</span>
+                <span id="settings-email" class="settings-value"></span>
+              </div>
+              <div class="settings-row">
+                <span class="settings-label">Rolle</span>
+                <span id="settings-role" class="settings-value"></span>
+              </div>
+              <div class="settings-row">
+                <span class="settings-label">Name</span>
+                <input id="settings-name" type="text" class="settings-input"
+                       placeholder="Ihr Name" autocomplete="name" />
+              </div>
+              <button class="btn btn-primary" id="settings-name-save">Name speichern</button>
+              <p class="settings-status" id="settings-name-status"></p>
+            </div>
+            <div class="settings-card">
+              <h3>Passwort ändern</h3>
+              <div class="form-group">
+                <label for="settings-pw-new">Neues Passwort</label>
+                <input id="settings-pw-new" type="password"
+                       placeholder="Mindestens 6 Zeichen" autocomplete="new-password" />
+              </div>
+              <div class="form-group">
+                <label for="settings-pw-confirm">Passwort bestätigen</label>
+                <input id="settings-pw-confirm" type="password"
+                       placeholder="Wiederholen" autocomplete="new-password" />
+              </div>
+              <button class="btn btn-primary" id="settings-pw-save">Passwort ändern</button>
+              <p class="settings-status" id="settings-pw-status"></p>
+            </div>
+          </div>
+        </div>
+
         <div id="todo-section" class="hidden">
           <div class="meds-toolbar">
             <button class="btn-icon" id="todo-back">← Chat</button>
@@ -289,7 +333,7 @@
 
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=53"></script>
+  <script src="app.js?v=54"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')

@@ -52,6 +52,18 @@ const todoFormList         = document.getElementById('todo-form-list')
 const todoFormSave         = document.getElementById('todo-form-save')
 const todoFormCancel       = document.getElementById('todo-form-cancel')
 const todoFormArchive      = document.getElementById('todo-form-archive')
+const settingsSection  = document.getElementById('settings-section')
+const settingsBack     = document.getElementById('settings-back')
+const settingsBtn      = document.getElementById('settings-btn')
+const settingsEmail    = document.getElementById('settings-email')
+const settingsRole     = document.getElementById('settings-role')
+const settingsNameInput= document.getElementById('settings-name')
+const settingsNameSave = document.getElementById('settings-name-save')
+const settingsNameStatus=document.getElementById('settings-name-status')
+const settingsPwNew    = document.getElementById('settings-pw-new')
+const settingsPwConfirm= document.getElementById('settings-pw-confirm')
+const settingsPwSave   = document.getElementById('settings-pw-save')
+const settingsPwStatus = document.getElementById('settings-pw-status')
 const medsSection    = document.getElementById('meds-section')
 const chatSection    = document.getElementById('chat-section')
 const medsBack       = document.getElementById('meds-back')
@@ -188,6 +200,7 @@ async function initApp (user) {
   exitSignupMode()
 
   const { displayName, role } = await ensureProfile(user)
+  _settingsRole = role
 
   // Caregivers and family members belong in the dashboard, not here
   if (role === 'caregiver' || role === 'family') {
@@ -585,10 +598,11 @@ let _activeSection = 'chat'
 
 function showSection (name) {
   _activeSection = name
-  chatSection.classList.toggle('hidden', name !== 'chat')
-  todoSection.classList.toggle('hidden', name !== 'todo')
-  medsSection.classList.toggle('hidden', name !== 'meds')
-  calSection.classList.toggle('hidden', name !== 'calendar')
+  chatSection.classList.toggle('hidden',     name !== 'chat')
+  settingsSection.classList.toggle('hidden', name !== 'settings')
+  todoSection.classList.toggle('hidden',     name !== 'todo')
+  medsSection.classList.toggle('hidden',     name !== 'meds')
+  calSection.classList.toggle('hidden',      name !== 'calendar')
 }
 
 function showChatView () { showSection('chat') }
@@ -602,6 +616,57 @@ function showCalendarView () {
   showSection('calendar')
   loadCalendarFromDB().then(entries => { _calendarEntries = entries; renderCalendarView() })
 }
+
+// ── Settings ─────────────────────────────────────────────
+
+let _settingsRole = 'user'
+
+function showSettingsView () {
+  showSection('settings')
+  if (!currentUser) return
+  settingsEmail.textContent = currentUser.email
+  const roleLabel = _settingsRole === 'caregiver' ? 'Betreuungsperson'
+                  : _settingsRole === 'family'    ? 'Familie'
+                  : 'Nutzer'
+  settingsRole.textContent = roleLabel
+  settingsNameInput.value  = currentUser.user_metadata?.display_name || ''
+  settingsNameStatus.textContent = ''
+  settingsPwNew.value     = ''
+  settingsPwConfirm.value = ''
+  settingsPwStatus.textContent = ''
+}
+
+settingsBtn.addEventListener('click', showSettingsView)
+settingsBack.addEventListener('click', () => showSection('chat'))
+
+settingsNameSave.addEventListener('click', async () => {
+  const name = settingsNameInput.value.trim()
+  if (!name) { settingsNameStatus.textContent = 'Bitte einen Namen eingeben.'; return }
+  const { error } = await sb.auth.updateUser({ data: { display_name: name } })
+  if (error) {
+    settingsNameStatus.textContent = 'Fehler: ' + error.message
+  } else {
+    await sb.from('profiles').update({ display_name: name }).eq('id', currentUser.id)
+    headerUser.textContent = name
+    settingsNameStatus.textContent = '✓ Name gespeichert.'
+  }
+})
+
+settingsPwSave.addEventListener('click', async () => {
+  const pw  = settingsPwNew.value
+  const pw2 = settingsPwConfirm.value
+  settingsPwStatus.textContent = ''
+  if (pw.length < 6)  { settingsPwStatus.textContent = 'Mindestens 6 Zeichen.'; return }
+  if (pw !== pw2)     { settingsPwStatus.textContent = 'Passwörter stimmen nicht überein.'; return }
+  const { error } = await sb.auth.updateUser({ password: pw })
+  if (error) {
+    settingsPwStatus.textContent = 'Fehler: ' + error.message
+  } else {
+    settingsPwNew.value     = ''
+    settingsPwConfirm.value = ''
+    settingsPwStatus.textContent = '✓ Passwort geändert.'
+  }
+})
 
 medsBtn.addEventListener('click', showMedsView)
 medsBack.addEventListener('click', showChatView)
