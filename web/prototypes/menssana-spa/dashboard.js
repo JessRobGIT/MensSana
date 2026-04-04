@@ -821,7 +821,18 @@ async function saveDashTodo () {
   const title = dashTodoTitle.value.trim()
   if (!title || !_detailUserId) { dashTodoTitle.focus(); return }
 
-  const listId  = dashTodoList.value || _dashActiveListId
+  let listId = dashTodoList.value || _dashActiveListId
+
+  // Auto-create default list if patient has none yet
+  if (!listId) {
+    const { data: newList, error: listErr } = await sb.from('todo_lists')
+      .insert([{ user_id: _detailUserId, name: 'Aufgaben' }])
+      .select('id').single()
+    if (listErr) { alert('Liste konnte nicht angelegt werden: ' + listErr.message); return }
+    listId = newList.id
+    _dashTodoLists.push({ id: listId, name: 'Aufgaben' })
+    _dashActiveListId = listId
+  }
   const payload = {
     title,
     notes:   dashTodoNotes.value.trim() || null,
