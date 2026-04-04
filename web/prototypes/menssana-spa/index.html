@@ -87,6 +87,7 @@
       <!-- ── CHAT ─────────────────────────────────────── -->
       <div class="chat-area">
         <div id="chat-section">
+          <div id="todo-reminder-bar" class="todo-reminder-bar hidden"></div>
           <div id="messages" role="log" aria-live="polite" aria-label="Gespräch"></div>
 
           <div class="input-bar">
@@ -288,7 +289,7 @@
 
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=50"></script>
+  <script src="app.js?v=51"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')

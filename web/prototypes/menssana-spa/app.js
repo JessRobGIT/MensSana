@@ -200,7 +200,8 @@ async function initApp (user) {
   await loadOrCreateConversation()
   await loadMessages()
   await loadConversations()
-  loadTodayMood()  // non-blocking — populates mood indicator when ready
+  loadTodayMood()         // non-blocking
+  loadTodoReminder()      // non-blocking — shows overdue banner if needed
 }
 
 async function ensureProfile (user) {
@@ -1441,6 +1442,91 @@ async function archiveTodoItem () {
   await loadAndRenderTodoItems()
 }
 
+// ── T4: Chat → Todo ───────────────────────────────────────
+
+async function loadTodoContext () {
+  if (!currentUser) return []
+  const { data } = await sb.from('todo_items')
+    .select('title, due_at, todo_lists(name)')
+    .eq('user_id', currentUser.id)
+    .eq('status', 'open')
+    .order('due_at', { ascending: true, nullsFirst: false })
+    .limit(10)
+  if (!data) return []
+  return data.map(i => ({
+    title:     i.title,
+    list_name: (i.todo_lists as any)?.name ?? 'Aufgaben',
+    due_at:    i.due_at ? isoDate(new Date(i.due_at)) : undefined,
+  }))
+}
+
+async function handleTodoAction (action: { type: string; list_name: string; title: string }) {
+  if (!currentUser || action.type !== 'add') return
+
+  // Find or create the list
+  let listId: string | null = null
+  const { data: lists } = await sb.from('todo_lists')
+    .select('id, name').eq('user_id', currentUser.id)
+  const match = lists?.find(l => l.name.toLowerCase() === action.list_name.toLowerCase())
+  if (match) {
+    listId = match.id
+  } else {
+    const { data: newList } = await sb.from('todo_lists')
+      .insert([{ user_id: currentUser.id, name: action.list_name }])
+      .select('id').single()
+    listId = newList?.id ?? null
+  }
+  if (!listId) return
+
+  await sb.from('todo_items').insert([{
+    list_id:    listId,
+    user_id:    currentUser.id,
+    title:      action.title,
+    created_by: currentUser.id,
+  }])
+
+  // Refresh todo section if open
+  if (_activeSection === 'todo') await loadAndRenderTodos()
+
+  // Show subtle confirmation in chat
+  const note = document.createElement('div')
+  note.className = 'message todo-confirm'
+  note.textContent = `✓ Aufgabe gespeichert: „${action.title}" [${action.list_name}]`
+  messagesEl.appendChild(note)
+  messagesEl.scrollTop = messagesEl.scrollHeight
+  setTimeout(() => note.remove(), 5000)
+}
+
+// ── T5: Reminder banner ────────────────────────────────────
+
+async function loadTodoReminder () {
+  if (!currentUser) return
+  const today = isoDate(new Date())
+  const { data } = await sb.from('todo_items')
+    .select('id')
+    .eq('user_id', currentUser.id)
+    .eq('status', 'open')
+    .lte('due_at', today + 'T23:59:59Z')
+    .limit(10)
+  const count = data?.length ?? 0
+  const bar = document.getElementById('todo-reminder-bar')
+  if (!bar) return
+  if (count > 0) {
+    bar.textContent = `📋 ${count === 1 ? '1 überfällige Aufgabe' : `${count} überfällige Aufgaben`} — `
+    const link = document.createElement('button')
+    link.className = 'todo-reminder-link'
+    link.textContent = 'Jetzt anzeigen'
+    link.addEventListener('click', async () => {
+      showSection('todo')
+      await loadAndRenderTodos()
+    })
+    bar.appendChild(link)
+    bar.classList.remove('hidden')
+  } else {
+    bar.classList.add('hidden')
+  }
+}
+
 // ── Mood ──────────────────────────────────────────────────
 
 // Single authoritative mapping — Edge Function returns the label,
@@ -1545,7 +1631,7 @@ async function callChatAPI (convId) {
           'Authorization': `Bearer ${session?.access_token ?? SUPABASE_ANON_KEY}`,
           'apikey':        SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ messages: history ?? [] }),
+        body: JSON.stringify({ messages: history ?? [], context: { todos: await loadTodoContext() } }),
       }
     )
 
@@ -1562,6 +1648,7 @@ async function callChatAPI (convId) {
       if (currentConversation?.id === convId) appendMessage('assistant', reply)
       await sb.from('messages').insert({ conversation_id: convId, role: 'assistant', content: reply })
       if (fnJson.mood) saveMoodToDB(fnJson.mood)
+      if (fnJson.todo_action?.type === 'add') handleTodoAction(fnJson.todo_action)
       await sb.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', convId)
       await loadConversations()
     } else {

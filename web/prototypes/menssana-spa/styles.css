@@ -1456,3 +1456,40 @@ html, body {
 .todo-input-bar button:not(:disabled):hover {
   background: var(--green-light);
 }
+
+/* ── TODO REMINDER BAR ─────────────────────────────────── */
+
+.todo-reminder-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #fff3cd;
+  border-bottom: 1px solid #ffc107;
+  font-size: 0.9rem;
+  color: #664d03;
+  flex-shrink: 0;
+}
+
+.todo-reminder-link {
+  background: none;
+  border: none;
+  color: var(--green);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: inherit;
+  font-family: inherit;
+  padding: 0;
+}
+
+.message.todo-confirm {
+  background: var(--green-pale);
+  color: var(--green);
+  font-size: 0.85rem;
+  padding: 8px 14px;
+  border-radius: 8px;
+  text-align: center;
+  align-self: center;
+  max-width: 80%;
+}
