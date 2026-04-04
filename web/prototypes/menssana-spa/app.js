@@ -248,7 +248,8 @@ async function ensureProfile (user) {
 }
 
 sb.auth.onAuthStateChange((event, session) => {
-  if (event === 'INITIAL_SESSION' || (event === 'SIGNED_IN' && !appInitialized)) {
+  if (event === 'INITIAL_SESSION' || event === 'PASSWORD_RECOVERY' ||
+      (event === 'SIGNED_IN' && !appInitialized)) {
     if (session?.user) setTimeout(() => initApp(session.user), 0)
   } else if (event === 'SIGNED_OUT') {
     appInitialized      = false
