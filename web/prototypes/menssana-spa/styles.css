@@ -1345,6 +1345,10 @@ html, body {
 .todo-item.done {
   opacity: 0.55;
 }
+.todo-item.overdue {
+  border-color: var(--danger);
+  background: #fff5f5;
+}
 
 .todo-check {
   width: 28px;

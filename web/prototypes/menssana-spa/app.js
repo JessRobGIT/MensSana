@@ -1420,6 +1420,7 @@ function renderTodoItems () {
       ? new Date(item.due_at).toLocaleDateString('de-DE', { day:'numeric', month:'short' })
       : ''
     const overdue = item.due_at && item.status !== 'done' && new Date(item.due_at) < new Date()
+    if (overdue) row.classList.add('overdue')
 
     row.innerHTML = `
       <button class="todo-check" data-id="${item.id}" aria-label="${item.status === 'done' ? 'Als offen markieren' : 'Als erledigt markieren'}">
@@ -1691,7 +1692,7 @@ async function loadTodoReminder () {
   if (!currentUser) return
   const today = isoDate(new Date())
   const { data } = await sb.from('todo_items')
-    .select('id')
+    .select('id, list_id')
     .eq('user_id', currentUser.id)
     .eq('status', 'open')
     .lte('due_at', today + 'T23:59:59Z')
@@ -1705,6 +1706,8 @@ async function loadTodoReminder () {
     link.className = 'todo-reminder-link'
     link.textContent = 'Jetzt anzeigen'
     link.addEventListener('click', async () => {
+      // Jump straight to the list that contains the first overdue item
+      if (data[0]?.list_id) _activeListId = data[0].list_id
       showSection('todo')
       await loadAndRenderTodos()
     })
