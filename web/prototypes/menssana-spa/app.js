@@ -13,6 +13,7 @@ let isSending           = false
 let appInitialized      = false
 let _medications        = []
 let _editingMedId       = null
+let _caregivers         = []   // [{ id, name }] — assigned caregivers of the current user
 
 // ── DOM refs ─────────────────────────────────────────────
 const loginView        = document.getElementById('login-view')
@@ -209,12 +210,16 @@ async function initApp (user) {
   }
 
   showApp()
+  showSection('chat')   // always start on chat, regardless of any previous state
   headerUser.textContent = displayName || user.email
   await loadOrCreateConversation()
   await loadMessages()
   await loadConversations()
   loadTodayMood()         // non-blocking
   loadTodoReminder()      // non-blocking — shows overdue banner if needed
+  setInterval(loadTodoReminder, 60 * 60 * 1000)  // refresh every hour
+  loadCaregivers()        // non-blocking — needed for delegation feature
+  loadIncomingMessages()  // non-blocking — show unread caregiver messages
 }
 
 async function ensureProfile (user) {
@@ -251,6 +256,8 @@ sb.auth.onAuthStateChange((event, session) => {
   if (event === 'INITIAL_SESSION' || event === 'PASSWORD_RECOVERY' ||
       (event === 'SIGNED_IN' && !appInitialized)) {
     if (session?.user) setTimeout(() => initApp(session.user), 0)
+  } else if (event === 'USER_UPDATED' && session?.user) {
+    currentUser = session.user   // keep currentUser in sync after profile/password changes
   } else if (event === 'SIGNED_OUT') {
     appInitialized      = false
     currentUser         = null
@@ -1458,6 +1465,7 @@ async function toggleTodoItem (item) {
   if (error) return
   item.status = newStatus
   renderTodoItems()
+  loadTodoReminder()   // update overdue count in banner
 }
 
 function showTodoItemForm (item) {
@@ -1506,6 +1514,7 @@ async function archiveTodoItem () {
   if (error) { showBanner('Archivieren fehlgeschlagen.', true); return }
   hideTodoForm()
   await loadAndRenderTodoItems()
+  loadTodoReminder()   // update overdue count in banner
 }
 
 // ── T4: Chat → Todo ───────────────────────────────────────
@@ -1527,40 +1536,153 @@ async function loadTodoContext () {
 }
 
 async function handleTodoAction (action) {
-  if (!currentUser || action.type !== 'add') return
+  if (!currentUser) return
 
-  // Find or create the list
-  let listId = null
-  const { data: lists } = await sb.from('todo_lists')
-    .select('id, name').eq('user_id', currentUser.id)
-  const match = lists?.find(l => l.name.toLowerCase() === action.list_name.toLowerCase())
-  if (match) {
-    listId = match.id
-  } else {
-    const { data: newList } = await sb.from('todo_lists')
-      .insert([{ user_id: currentUser.id, name: action.list_name }])
-      .select('id').single()
-    listId = newList?.id ?? null
+  if (action.type === 'add') {
+    // Find or create the target list
+    let listId = null
+    const { data: lists } = await sb.from('todo_lists')
+      .select('id, name').eq('user_id', currentUser.id)
+    const match = lists?.find(l => l.name.toLowerCase() === (action.list_name ?? 'Aufgaben').toLowerCase())
+    if (match) {
+      listId = match.id
+    } else {
+      const { data: newList } = await sb.from('todo_lists')
+        .insert([{ user_id: currentUser.id, name: action.list_name ?? 'Aufgaben' }])
+        .select('id').single()
+      listId = newList?.id ?? null
+    }
+    if (!listId) return
+
+    // Parse due_at: Claude returns YYYY-MM-DD
+    let dueAt = null
+    if (action.due_at) {
+      const d = new Date(action.due_at + 'T12:00:00')
+      if (!isNaN(d.getTime())) dueAt = d.toISOString()
+    }
+
+    await sb.from('todo_items').insert([{
+      list_id:    listId,
+      user_id:    currentUser.id,
+      title:      action.title,
+      due_at:     dueAt,
+      created_by: currentUser.id,
+    }])
+
+    if (_activeSection === 'todo') await loadAndRenderTodos()
+
+    const label = dueAt
+      ? `„${action.title}" [${action.list_name}] — fällig ${action.due_at}`
+      : `„${action.title}" [${action.list_name}]`
+    showTodoConfirm('✓ Aufgabe gespeichert: ' + label)
+
+  } else if (action.type === 'done') {
+    // Find the open item by title (case-insensitive, partial match)
+    const { data: items } = await sb.from('todo_items')
+      .select('id, title')
+      .eq('user_id', currentUser.id)
+      .eq('status', 'open')
+      .ilike('title', `%${action.title}%`)
+      .limit(1)
+    if (!items?.length) return
+
+    await sb.from('todo_items')
+      .update({ status: 'done', completed_at: new Date().toISOString() })
+      .eq('id', items[0].id)
+
+    if (_activeSection === 'todo') await loadAndRenderTodos()
+    loadTodoReminder()
+
+    showTodoConfirm(`✓ Als erledigt markiert: „${items[0].title}"`)
   }
-  if (!listId) return
+}
 
-  await sb.from('todo_items').insert([{
-    list_id:    listId,
-    user_id:    currentUser.id,
-    title:      action.title,
-    created_by: currentUser.id,
-  }])
-
-  // Refresh todo section if open
-  if (_activeSection === 'todo') await loadAndRenderTodos()
-
-  // Show subtle confirmation in chat
+function showTodoConfirm (text) {
   const note = document.createElement('div')
   note.className = 'message todo-confirm'
-  note.textContent = `✓ Aufgabe gespeichert: „${action.title}" [${action.list_name}]`
+  note.textContent = text
   messagesEl.appendChild(note)
   messagesEl.scrollTop = messagesEl.scrollHeight
   setTimeout(() => note.remove(), 5000)
+}
+
+// ── Phase 4.2: Messaging ──────────────────────────────────
+
+async function loadCaregivers () {
+  if (!currentUser) return
+  const { data: assignments } = await sb
+    .from('caregiver_assignments')
+    .select('caregiver_id')
+    .eq('user_id', currentUser.id)
+  if (!assignments?.length) { _caregivers = []; return }
+  const ids = assignments.map(a => a.caregiver_id)
+  const { data: profiles } = await sb
+    .from('profiles')
+    .select('id, display_name, full_name')
+    .in('id', ids)
+  _caregivers = (profiles ?? []).map(p => ({
+    id:   p.id,
+    name: p.display_name || p.full_name || p.id,
+  }))
+}
+
+async function handleMessageAction (action) {
+  if (!currentUser || !action?.content) return
+  const needle = (action.recipient_name ?? '').toLowerCase().trim()
+  if (!needle) return
+  const match = _caregivers.find(c =>
+    c.name.toLowerCase().includes(needle) || needle.includes(c.name.toLowerCase())
+  )
+  if (!match) return
+  await sb.from('internal_messages').insert({
+    from_id: currentUser.id,
+    to_id:   match.id,
+    content: action.content,
+  })
+  showTodoConfirm(`📬 Nachricht an ${match.name} gesendet.`)
+}
+
+async function loadIncomingMessages () {
+  if (!currentUser) return
+  const { data } = await sb
+    .from('internal_messages')
+    .select('id, content, created_at, from_id')
+    .eq('to_id', currentUser.id)
+    .is('read_at', null)
+    .order('created_at', { ascending: false })
+    .limit(20)
+
+  const bar = document.getElementById('msg-banner')
+  if (!bar) return
+
+  if (!data?.length) { bar.classList.add('hidden'); return }
+
+  // Load sender names
+  const senderIds = [...new Set(data.map(m => m.from_id))]
+  const { data: senderProfiles } = await sb
+    .from('profiles')
+    .select('id, display_name, full_name')
+    .in('id', senderIds)
+  const nameById = {}
+  senderProfiles?.forEach(p => { nameById[p.id] = p.display_name || p.full_name || 'Betreuungsperson' })
+
+  const names = [...new Set(data.map(m => nameById[m.from_id] ?? 'Betreuungsperson'))]
+  const noun  = data.length === 1 ? 'neue Nachricht' : 'neue Nachrichten'
+
+  bar.innerHTML = ''
+  const span = document.createElement('span')
+  span.textContent = `📬 ${data.length} ${noun} von ${names.join(', ')}`
+  const btn = document.createElement('button')
+  btn.className   = 'todo-reminder-link'
+  btn.textContent = 'Gelesen'
+  btn.addEventListener('click', async () => {
+    const ids = data.map(m => m.id)
+    await sb.from('internal_messages').update({ read_at: new Date().toISOString() }).in('id', ids)
+    bar.classList.add('hidden')
+  })
+  bar.appendChild(span)
+  bar.appendChild(btn)
+  bar.classList.remove('hidden')
 }
 
 // ── T5: Reminder banner ────────────────────────────────────
@@ -1697,7 +1819,7 @@ async function callChatAPI (convId) {
           'Authorization': `Bearer ${session?.access_token ?? SUPABASE_ANON_KEY}`,
           'apikey':        SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ messages: history ?? [], context: { todos: await loadTodoContext() } }),
+        body: JSON.stringify({ messages: history ?? [], context: { todos: await loadTodoContext(), today: isoDate(new Date()), caregivers: _caregivers.map(c => c.name) } }),
       }
     )
 
@@ -1714,7 +1836,8 @@ async function callChatAPI (convId) {
       if (currentConversation?.id === convId) appendMessage('assistant', reply)
       await sb.from('messages').insert({ conversation_id: convId, role: 'assistant', content: reply })
       if (fnJson.mood) saveMoodToDB(fnJson.mood)
-      if (fnJson.todo_action?.type === 'add') handleTodoAction(fnJson.todo_action)
+      if (fnJson.todo_action) handleTodoAction(fnJson.todo_action)
+      if (fnJson.message_action) handleMessageAction(fnJson.message_action)
       await sb.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', convId)
       await loadConversations()
     } else {

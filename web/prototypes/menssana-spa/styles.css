@@ -1457,6 +1457,20 @@ html, body {
   background: var(--green-light);
 }
 
+/* ── MESSAGE BANNER ────────────────────────────────────── */
+
+.msg-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #cfe2ff;
+  border-bottom: 1px solid #9ec5fe;
+  font-size: 0.9rem;
+  color: #084298;
+  flex-shrink: 0;
+}
+
 /* ── TODO REMINDER BAR ─────────────────────────────────── */
 
 .todo-reminder-bar {

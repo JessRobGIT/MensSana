@@ -106,6 +106,13 @@
             <div id="dash-todo-items" class="detail-list"></div>
           </div>
 
+          <div class="detail-card detail-card-full">
+            <h3>Nachrichten
+              <button class="detail-add-btn" id="dash-msg-send-btn">+ Nachricht</button>
+            </h3>
+            <div id="dash-msg-thread" class="dash-msg-thread"></div>
+          </div>
+
         </div>
       </section>
 
@@ -256,6 +263,22 @@
         <button class="btn btn-secondary" id="dash-todo-cancel">Abbrechen</button>
         <button class="btn btn-danger"    id="dash-todo-archive" style="display:none">Archivieren</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Nachrichten senden -->
+  <div id="dash-msg-overlay" class="dash-form-overlay hidden" role="dialog" aria-modal="true">
+    <div class="dash-form-card">
+      <h3 id="dash-msg-form-title">Nachricht senden</h3>
+      <div class="form-group">
+        <label for="dash-msg-text">Nachricht</label>
+        <textarea id="dash-msg-text" rows="4" placeholder="Ihre Nachricht …"></textarea>
+      </div>
+      <div class="dash-form-actions">
+        <button class="btn btn-primary"   id="dash-msg-save">Senden</button>
+        <button class="btn btn-secondary" id="dash-msg-cancel">Abbrechen</button>
+      </div>
+      <p class="settings-status" id="dash-msg-status"></p>
     </div>
   </div>
 

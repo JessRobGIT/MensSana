@@ -44,6 +44,15 @@ const detailPanel  = document.getElementById('detail-panel')
 const detailBack   = document.getElementById('detail-back')
 const detailName   = document.getElementById('detail-name')
 
+const dashMsgThread    = document.getElementById('dash-msg-thread')
+const dashMsgOverlay   = document.getElementById('dash-msg-overlay')
+const dashMsgSendBtn   = document.getElementById('dash-msg-send-btn')
+const dashMsgFormTitle = document.getElementById('dash-msg-form-title')
+const dashMsgText      = document.getElementById('dash-msg-text')
+const dashMsgSave      = document.getElementById('dash-msg-save')
+const dashMsgCancel    = document.getElementById('dash-msg-cancel')
+const dashMsgStatus    = document.getElementById('dash-msg-status')
+
 // ── Helpers ───────────────────────────────────────────────
 function isoDate (d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
@@ -113,7 +122,13 @@ let _dashSelectedDate = null
 
 sb.auth.onAuthStateChange((event, session) => {
   if (session?.user && !_dashInitialized) {
-    setTimeout(() => initDashboard(session.user), 0)
+    const isRecovery = event === 'PASSWORD_RECOVERY'
+    setTimeout(() => initDashboard(session.user, isRecovery), 0)
+  } else if (event === 'USER_UPDATED' && session?.user) {
+    // Refresh _dashCurrentUser but preserve the custom _role property
+    const savedRole = _dashCurrentUser?._role
+    _dashCurrentUser = session.user
+    if (savedRole) _dashCurrentUser._role = savedRole
   } else if (!session?.user) {
     _dashInitialized = false
     showLogin()
@@ -146,10 +161,10 @@ logoutBtn.addEventListener('click', async () => {
 
 let _dashCurrentUser = null
 
-dashSettingsBtn.addEventListener('click', () => {
+function openSettingsOverlay () {
   if (!_dashCurrentUser) return
-  dashSettingsEmail.textContent = _dashCurrentUser.email
   const ROLE_LABELS = { caregiver: 'Betreuungsperson', family: 'Familie' }
+  dashSettingsEmail.textContent = _dashCurrentUser.email ?? '—'
   dashSettingsRole.textContent  = ROLE_LABELS[_dashCurrentUser._role] ?? _dashCurrentUser._role ?? '—'
   dashSettingsName.value        = _dashCurrentUser.user_metadata?.display_name || ''
   dashSettingsNameStatus.textContent = ''
@@ -157,10 +172,17 @@ dashSettingsBtn.addEventListener('click', () => {
   dashSettingsPwConfirm.value = ''
   dashSettingsPwStatus.textContent = ''
   dashSettingsOverlay.classList.remove('hidden')
-})
+}
+
+dashSettingsBtn.addEventListener('click', openSettingsOverlay)
 
 dashSettingsClose.addEventListener('click', () => {
   dashSettingsOverlay.classList.add('hidden')
+})
+
+// Click outside the card to close
+dashSettingsOverlay.addEventListener('click', e => {
+  if (e.target === dashSettingsOverlay) dashSettingsOverlay.classList.add('hidden')
 })
 
 dashSettingsNameSave.addEventListener('click', async () => {
@@ -189,6 +211,7 @@ dashSettingsPwSave.addEventListener('click', async () => {
     dashSettingsPwNew.value     = ''
     dashSettingsPwConfirm.value = ''
     dashSettingsPwStatus.textContent = '✓ Passwort geändert.'
+    setTimeout(() => dashSettingsOverlay.classList.add('hidden'), 1500)
   }
 })
 
@@ -197,7 +220,7 @@ function showLogin () {
   dashView.classList.add('hidden')
 }
 
-async function initDashboard (user) {
+async function initDashboard (user, isRecovery = false) {
   _dashInitialized = true
   _caregiverId     = user.id
   _dashCurrentUser = user
@@ -229,6 +252,8 @@ async function initDashboard (user) {
   loginView.classList.add('hidden')
   dashView.classList.remove('hidden')
   showUserList()
+
+  if (isRecovery) openSettingsOverlay()
 }
 
 // ── User list ─────────────────────────────────────────────
@@ -287,6 +312,21 @@ async function showUserList () {
     .gte('starts_at', new Date().toISOString())
     .order('starts_at', { ascending: true })
 
+  // Load unread messages from users to this caregiver
+  const { data: unreadMsgs } = await sb
+    .from('internal_messages')
+    .select('from_id')
+    .eq('to_id', _caregiverId)
+    .in('from_id', userIds)
+    .is('read_at', null)
+
+  // Load open todos per user (for stat + overdue count)
+  const { data: openTodos } = await sb
+    .from('todo_items')
+    .select('user_id, due_at')
+    .in('user_id', userIds)
+    .eq('status', 'open')
+
   // Build lookup maps
   const lastActivity = {}
   convs?.forEach(c => { if (!lastActivity[c.user_id]) lastActivity[c.user_id] = c.updated_at })
@@ -300,6 +340,19 @@ async function showUserList () {
   const nextEvent = {}
   events?.forEach(e => { if (!nextEvent[e.user_id]) nextEvent[e.user_id] = e })
 
+  const unreadCount = {}
+  unreadMsgs?.forEach(m => { unreadCount[m.from_id] = (unreadCount[m.from_id] ?? 0) + 1 })
+
+  const openCount    = {}
+  const overdueCount = {}
+  const todayEnd     = today + 'T23:59:59Z'
+  openTodos?.forEach(t => {
+    openCount[t.user_id] = (openCount[t.user_id] ?? 0) + 1
+    if (t.due_at && t.due_at <= todayEnd) {
+      overdueCount[t.user_id] = (overdueCount[t.user_id] ?? 0) + 1
+    }
+  })
+
   usersGrid.innerHTML = ''
   profiles?.forEach(p => {
     const displayName = p.display_name || p.full_name || 'Unbekannt'
@@ -309,6 +362,13 @@ async function showUserList () {
     const evt         = nextEvent[p.id]
     const actCls      = activityClass(lastAct)
     const moodCls     = mood ? (MOOD_CLASS[mood] ?? 'mx') : 'mx'
+    const badge       = unreadCount[p.id] ? `<span class="msg-badge">${unreadCount[p.id]}</span>` : ''
+    const open        = openCount[p.id] ?? 0
+    const overdue     = overdueCount[p.id] ?? 0
+    const todoStatCls = overdue > 0 ? ' activity-warn' : ''
+    const todoStat    = open > 0
+      ? `${open} offen${overdue > 0 ? ` · ${overdue} überfällig` : ''}`
+      : '—'
 
     const card = document.createElement('div')
     card.className = 'user-card'
@@ -317,7 +377,7 @@ async function showUserList () {
       <div class="user-card-header">
         <div class="user-avatar">${escHtml(initials(displayName))}</div>
         <div>
-          <div class="user-card-name">${escHtml(displayName)}</div>
+          <div class="user-card-name">${escHtml(displayName)}${badge}</div>
         </div>
       </div>
       <div class="user-card-stats">
@@ -339,6 +399,10 @@ async function showUserList () {
           <div class="stat-label">Nächster Termin</div>
           <div class="stat-value">${evt ? escHtml(evt.title) : '—'}</div>
         </div>
+        <div class="stat-item">
+          <div class="stat-label">Aufgaben</div>
+          <div class="stat-value${todoStatCls}">${todoStat}</div>
+        </div>
       </div>
     `
     card.addEventListener('click', () => showDetail(p.id, displayName))
@@ -356,10 +420,11 @@ async function showDetail (userId, name) {
   detailName.textContent = name
 
   // Clear previous content
-  document.getElementById('mood-chart').innerHTML = '<span class="detail-empty">Wird geladen …</span>'
-  document.getElementById('conv-list').innerHTML  = '<span class="detail-empty">Wird geladen …</span>'
-  document.getElementById('meds-list').innerHTML  = '<span class="detail-empty">Wird geladen …</span>'
+  document.getElementById('mood-chart').innerHTML  = '<span class="detail-empty">Wird geladen …</span>'
+  document.getElementById('conv-list').innerHTML   = '<span class="detail-empty">Wird geladen …</span>'
+  document.getElementById('meds-list').innerHTML   = '<span class="detail-empty">Wird geladen …</span>'
   document.getElementById('events-list').innerHTML = '<span class="detail-empty">Wird geladen …</span>'
+  dashMsgThread.innerHTML                          = '<span class="detail-empty">Wird geladen …</span>'
 
   // Load all data in parallel
   const today = new Date()
@@ -396,6 +461,7 @@ async function showDetail (userId, name) {
   renderMedications(medsRes.data ?? [])
   renderDashCalendar(eventsRes.data ?? [])
   await loadAndRenderDashTodos(userId)
+  await loadAndRenderMessages(userId)
 }
 
 function renderMoodChart (entries) {
@@ -752,7 +818,7 @@ let _dashTodoLists      = []
 let _dashTodoItems      = []
 let _dashActiveListId   = null
 let _editingTodoId      = null
-let _dashShowDone       = false
+let _dashTodoFilter     = 'open'   // 'open' | 'done' | 'archived'
 
 document.getElementById('dash-todo-add-btn').addEventListener('click', () => openDashTodoForm(null))
 dashTodoSave.addEventListener('click',    saveDashTodo)
@@ -766,7 +832,7 @@ async function loadAndRenderDashTodos (userId) {
     .order('created_at', { ascending: true })
   _dashTodoLists = lists ?? []
   _dashActiveListId = _dashTodoLists[0]?.id ?? null
-  _dashShowDone = false
+  _dashTodoFilter = 'open'
   renderDashTodoListsBar()
   await loadDashTodoItems()
 }
@@ -789,37 +855,38 @@ function renderDashTodoListsBar () {
     bar.appendChild(btn)
   })
 
-  const toggle = document.createElement('button')
-  toggle.className = 'dash-todo-done-toggle' + (_dashShowDone ? ' active' : '')
-  toggle.textContent = _dashShowDone ? '✓ Ausblenden' : '✓ Erledigt'
-  toggle.addEventListener('click', () => {
-    _dashShowDone = !_dashShowDone
-    renderDashTodoListsBar()
-    renderDashTodoItems()
+  const FILTER_LABELS = { open: 'Offen', done: 'Erledigt', archived: 'Archiviert' }
+  Object.keys(FILTER_LABELS).forEach(f => {
+    const btn = document.createElement('button')
+    btn.className   = 'dash-todo-done-toggle' + (f === _dashTodoFilter ? ' active' : '')
+    btn.textContent = FILTER_LABELS[f]
+    btn.addEventListener('click', () => {
+      _dashTodoFilter = f
+      renderDashTodoListsBar()
+      renderDashTodoItems()
+    })
+    bar.appendChild(btn)
   })
-  bar.appendChild(toggle)
 }
 
 async function loadDashTodoItems () {
   const el = document.getElementById('dash-todo-items')
   if (!_dashActiveListId) { el.innerHTML = '<span class="detail-empty">Keine Listen vorhanden.</span>'; return }
   const { data } = await sb.from('todo_items')
-    .select('id, title, notes, status, due_at, created_by')
+    .select('id, title, notes, status, due_at, created_by, updated_by')
     .eq('list_id', _dashActiveListId)
-    .neq('status', 'archived')
-    .order('created_at', { ascending: true })
+    .order('due_at', { ascending: true, nullsFirst: false })
   _dashTodoItems = data ?? []
   renderDashTodoItems()
 }
 
 function renderDashTodoItems () {
   const el = document.getElementById('dash-todo-items')
-  const items = _dashShowDone
-    ? _dashTodoItems
-    : _dashTodoItems.filter(i => i.status !== 'done')
+  const items = _dashTodoItems.filter(i => i.status === _dashTodoFilter)
 
+  const EMPTY_LABELS = { open: 'Keine offenen Aufgaben.', done: 'Keine erledigten Aufgaben.', archived: 'Keine archivierten Aufgaben.' }
   if (!items.length) {
-    el.innerHTML = '<span class="detail-empty">Keine offenen Aufgaben.</span>'
+    el.innerHTML = `<span class="detail-empty">${EMPTY_LABELS[_dashTodoFilter] ?? 'Keine Aufgaben.'}</span>`
     return
   }
 
@@ -834,11 +901,13 @@ function renderDashTodoItems () {
     const overdue = item.due_at && item.status !== 'done' && new Date(item.due_at) < new Date()
     const byCaregiver = item.created_by && item.created_by !== _detailUserId
 
+    const isArchived  = item.status === 'archived'
+    const checkSymbol = item.status === 'done' ? '✓' : item.status === 'archived' ? '—' : ''
     row.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
-        <button class="dash-todo-check" data-id="${item.id}">${item.status === 'done' ? '✓' : ''}</button>
+        <button class="dash-todo-check${isArchived ? ' dash-todo-check-disabled' : ''}" data-id="${item.id}">${checkSymbol}</button>
         <div style="flex:1;min-width:0">
-          <div class="detail-row-main${item.status === 'done' ? ' dash-todo-strike' : ''}">
+          <div class="detail-row-main${item.status !== 'open' ? ' dash-todo-strike' : ''}">
             ${escHtml(item.title)}${byCaregiver ? ' <span class="audit-badge">P</span>' : ''}
           </div>
           ${dueStr ? `<div class="detail-row-sub${overdue ? ' dash-todo-overdue' : ''}">${dueStr}</div>` : ''}
@@ -846,7 +915,7 @@ function renderDashTodoItems () {
       </div>
       <button class="detail-edit-btn">Bearbeiten</button>`
 
-    row.querySelector('.dash-todo-check').addEventListener('click', () => toggleDashTodo(item))
+    if (!isArchived) row.querySelector('.dash-todo-check').addEventListener('click', () => toggleDashTodo(item))
     row.querySelector('.detail-edit-btn').addEventListener('click', () => openDashTodoForm(item))
     el.appendChild(row)
   })
@@ -930,3 +999,77 @@ async function archiveDashTodo () {
   closeDashTodoForm()
   await loadDashTodoItems()
 }
+
+// ── Phase 4.2: Nachrichten ────────────────────────────────
+
+async function loadAndRenderMessages (userId) {
+  if (!dashMsgThread) return
+  dashMsgThread.innerHTML = '<span class="detail-empty">Wird geladen …</span>'
+
+  const { data } = await sb
+    .from('internal_messages')
+    .select('id, from_id, to_id, content, read_at, created_at')
+    .or(`and(from_id.eq.${_caregiverId},to_id.eq.${userId}),and(from_id.eq.${userId},to_id.eq.${_caregiverId})`)
+    .order('created_at', { ascending: true })
+    .limit(50)
+
+  if (!data?.length) {
+    dashMsgThread.innerHTML = '<span class="detail-empty">Noch keine Nachrichten.</span>'
+    return
+  }
+
+  dashMsgThread.innerHTML = ''
+  data.forEach(m => {
+    const isOut = m.from_id === _caregiverId
+    const div   = document.createElement('div')
+    div.className = `msg-bubble ${isOut ? 'msg-out' : 'msg-in'}`
+    const d     = new Date(m.created_at)
+    const time  = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+    const date  = d.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })
+    const status = isOut ? (m.read_at ? ' · gelesen' : ' · ungelesen') : ''
+    div.innerHTML = `
+      <div class="msg-content">${escHtml(m.content)}</div>
+      <div class="msg-meta">${date} ${time}${status}</div>`
+    dashMsgThread.appendChild(div)
+  })
+  dashMsgThread.scrollTop = dashMsgThread.scrollHeight
+
+  // Mark unread messages sent TO caregiver as read
+  const unreadIds = data.filter(m => m.to_id === _caregiverId && !m.read_at).map(m => m.id)
+  if (unreadIds.length) {
+    await sb.from('internal_messages').update({ read_at: new Date().toISOString() }).in('id', unreadIds)
+  }
+}
+
+dashMsgSendBtn?.addEventListener('click', () => {
+  if (!_detailUserId) return
+  dashMsgText.value              = ''
+  dashMsgStatus.textContent      = ''
+  dashMsgFormTitle.textContent   = 'Nachricht an ' + detailName.textContent
+  dashMsgOverlay.classList.remove('hidden')
+})
+
+dashMsgCancel?.addEventListener('click', () => dashMsgOverlay.classList.add('hidden'))
+
+dashMsgOverlay?.addEventListener('click', e => {
+  if (e.target === dashMsgOverlay) dashMsgOverlay.classList.add('hidden')
+})
+
+dashMsgSave?.addEventListener('click', async () => {
+  const content = dashMsgText.value.trim()
+  if (!content) { dashMsgStatus.textContent = 'Bitte eine Nachricht eingeben.'; return }
+  if (!_detailUserId || !_caregiverId) return
+  dashMsgSave.disabled = true
+  const { error } = await sb.from('internal_messages').insert({
+    from_id: _caregiverId,
+    to_id:   _detailUserId,
+    content,
+  })
+  dashMsgSave.disabled = false
+  if (error) {
+    dashMsgStatus.textContent = 'Fehler: ' + error.message
+  } else {
+    dashMsgOverlay.classList.add('hidden')
+    await loadAndRenderMessages(_detailUserId)
+  }
+})
