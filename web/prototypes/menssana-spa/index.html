@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#2d6a4f" />
   <title>MensSana</title>
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="styles.css?v=3" />
+  <link rel="stylesheet" href="styles.css?v=4" />
 </head>
 <body>
 
@@ -91,6 +91,10 @@
           <div id="msg-banner" class="msg-banner hidden"></div>
           <div id="todo-reminder-bar" class="todo-reminder-bar hidden"></div>
           <div id="messages" role="log" aria-live="polite" aria-label="Gespräch"></div>
+
+          <div class="suggestion-chips">
+            <button class="chip-btn" id="game-chip-btn">🎮 Spiel spielen</button>
+          </div>
 
           <div class="input-bar">
             <textarea
@@ -334,7 +338,7 @@
 
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=56"></script>
+  <script src="app.js?v=57"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')

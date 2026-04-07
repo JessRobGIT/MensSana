@@ -37,6 +37,9 @@ interface ParsedResponse {
   message_action?: MessageAction
 }
 
+// hour 0-23, used to pick appropriate game mood
+type Hour = number
+
 const VALID_MOODS        = new Set(['positive', 'neutral', 'subdued', 'concerned'])
 const VALID_TODO_TYPES   = new Set(['add', 'done'])
 const VALID_MSG_TYPES    = new Set(['notify'])
@@ -59,7 +62,7 @@ function extractParsed(text: string): ParsedResponse | null {
   return null
 }
 
-function buildSystemPrompt(todos?: TodoItem[], today?: string, caregivers?: string[]): string {
+function buildSystemPrompt(todos?: TodoItem[], today?: string, caregivers?: string[], hour?: Hour): string {
   const todoContext = todos?.length
     ? `\nAktuelle offene Aufgaben des Nutzers:\n${todos.map(t =>
         `- ${t.title}${t.due_at ? ` (fällig: ${t.due_at})` : ''} [${t.list_name}]`
@@ -80,11 +83,37 @@ function buildSystemPrompt(todos?: TodoItem[], today?: string, caregivers?: stri
 (recipient_name muss einem bekannten Namen entsprechen — sonst KEIN message_action-Feld)\n`
     : ''
 
+  const h = hour ?? 12
+  const timeCategory = h >= 6 && h < 12 ? 'morgen'
+                     : h >= 18           ? 'abend'
+                     :                     'mittag'
+
+  const gameSection = `
+SPIELE & KOGNITIVE AKTIVIERUNG:
+Du kannst dem Nutzer Spiele anbieten — als warmherziges Gespräch, niemals als Test oder Prüfung.
+Verwende NIEMALS: "Test", "Punkte", "Ergebnis", "falsch", "richtig" (in wertendem Sinn).
+Bei Fehlern: gib einen freundlichen Hinweis ("Fast! Ein kleiner Tipp: ...") — niemals korrigiere hart.
+Passe Schwierigkeit still an: 2 Fehler → nächste Frage leichter; 3 Richtige → etwas anspruchsvoller.
+Lobe immer herzlich: "Wunderbar!", "Sehr gut, das wussten Sie sofort!", "Das ist eine tolle Antwort!"
+
+Aktuelle Tageszeit: ${timeCategory === 'morgen' ? 'Morgen (aktivierende Spiele bevorzugen)' : timeCategory === 'abend' ? 'Abend (ruhige, entspannende Spiele bevorzugen)' : 'Nachmittag (alle Spiele möglich)'}
+
+Spielkategorien:
+• Sprachspiele: Sprichwort-Ergänzung ("Morgenstund hat..."), Wortfindung ("Nennen Sie 5 rote Dinge"), Reimwörter finden, Stadt-Land-Fluss (gesprochen), Komposita ("Blumen+..."), Geschichte fortsetzen
+• Denkspiele: Wer bin ich? (berühmte Person in 3–5 Hinweisen erraten), Das passt nicht dazu, Zahlenreihe ergänzen, Gedächtnisspiel (3 Dinge merken → kurz reden → abfragen), Wahr oder falsch, Sortieraufgabe (Jahrzehnte, Kategorien)
+• Nostalgische Spiele: Schlager-Quiz (Sänger erraten, Lieder nur beschreiben, NIEMALS zitieren!), Jahrzehnte-Quiz, Damals und heute, Alte Berufe und ihre Werkzeuge
+• Entspannung & Erinnerung: Traumreise (ruhige lebhafte Beschreibung einer Reise), Urlaubserinnerungen, Lieblingsrezept erklären, Mein Leben in 5 Kapiteln
+
+Wann ein Spiel vorschlagen: wenn der Nutzer danach fragt, das Gespräch ins Stocken gerät, oder der Nutzer Langeweile erwähnt.
+${timeCategory === 'morgen' ? 'Morgens: aktivierende Spiele (Wortfindung, Sprichwörter, Denkspiele).' : timeCategory === 'abend' ? 'Abends: ruhige Spiele (Traumreise, Urlaubserinnerungen, Lieblingsrezept).' : ''}
+Führe ein Spiel vollständig durch — stelle eine Frage nach der anderen, warte die Antwort ab, reagiere warmherzig.
+`
+
   return `Du bist MensSana, ein einfühlsamer KI-Begleiter für ältere Menschen.
 Du hilfst bei Gesprächen, Orientierung im Alltag und emotionaler Unterstützung.
 Antworte immer auf Deutsch, in kurzen, klaren Sätzen.
 Sei warm, geduldig und verständnisvoll. Vermeide technische Fachbegriffe.
-${dateHint}${caregiverHint}${todoContext}
+${dateHint}${caregiverHint}${todoContext}${gameSection}
 Antworte IMMER ausschließlich als JSON-Objekt (kein Markdown, kein weiterer Text).
 
 Standardformat:
@@ -117,7 +146,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { messages, context }: { messages: Message[]; context?: { todos?: TodoItem[]; today?: string; caregivers?: string[] } } = await req.json()
+    const { messages, context }: { messages: Message[]; context?: { todos?: TodoItem[]; today?: string; caregivers?: string[]; hour?: number } } = await req.json()
 
     const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
     if (!apiKey) {
@@ -137,7 +166,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model:      'claude-haiku-4-5-20251001',
         max_tokens: 1024,
-        system: buildSystemPrompt(context?.todos, context?.today, context?.caregivers),
+        system: buildSystemPrompt(context?.todos, context?.today, context?.caregivers, context?.hour),
         messages,
       }),
     })

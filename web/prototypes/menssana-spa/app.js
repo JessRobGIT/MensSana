@@ -1822,7 +1822,7 @@ async function callChatAPI (convId) {
           'Authorization': `Bearer ${session?.access_token ?? SUPABASE_ANON_KEY}`,
           'apikey':        SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ messages: history ?? [], context: { todos: await loadTodoContext(), today: isoDate(new Date()), caregivers: _caregivers.map(c => c.name) } }),
+        body: JSON.stringify({ messages: history ?? [], context: { todos: await loadTodoContext(), today: isoDate(new Date()), hour: new Date().getHours(), caregivers: _caregivers.map(c => c.name) } }),
       }
     )
 
@@ -1915,6 +1915,17 @@ window.addEventListener('online', async () => {
 })
 
 sendBtn.addEventListener('click', sendMessage)
+
+// ── Game chip ─────────────────────────────────────────────
+document.getElementById('game-chip-btn')?.addEventListener('click', async () => {
+  if (isSending || !currentConversation) return
+  const h = new Date().getHours()
+  const hint = h >= 18 ? 'ein ruhiges Spiel' : h < 12 ? 'ein munteres Spiel' : 'ein Spiel'
+  messageInput.value = `Ich würde gern ${hint} spielen. Was schlägst du vor?`
+  autoResize()
+  sendBtn.disabled = false
+  await sendMessage()
+})
 
 messageInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
