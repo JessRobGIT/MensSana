@@ -5,7 +5,7 @@ const CACHE = 'menssana-v17'
 const ASSETS = [
   '/MensSana/',
   '/MensSana/index.html',
-  '/MensSana/styles.css',
+  '/MensSana/styles.css?v=2',
   '/MensSana/app.js',
   '/MensSana/supabase.min.js',
   '/MensSana/manifest.json',
