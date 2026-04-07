@@ -1516,6 +1516,7 @@ html, body {
   height: 100%;
   overflow-y: auto;
 }
+#settings-section.hidden { display: none; }
 
 .settings-body {
   padding: 16px;
