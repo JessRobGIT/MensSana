@@ -290,6 +290,7 @@ function showLogin () {
 function showApp () {
   loginView.style.display = 'none'
   appView.style.display   = 'flex'
+  logoutBtn.disabled = false   // always re-enable on app show (may have been set during prior logout)
 }
 
 function setLoginStatus (msg, isError = false) {
@@ -645,7 +646,12 @@ function showSettingsView () {
 }
 
 settingsBtn.addEventListener('click', showSettingsView)
-settingsBack.addEventListener('click', () => showSection('chat'))
+settingsBack.addEventListener('click', () => {
+  // Clear password fields so browser doesn't show a "Save password?" prompt
+  settingsPwNew.value     = ''
+  settingsPwConfirm.value = ''
+  showSection('chat')
+})
 
 settingsNameSave.addEventListener('click', async () => {
   const name = settingsNameInput.value.trim()
