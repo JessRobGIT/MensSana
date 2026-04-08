@@ -1357,13 +1357,19 @@ html, body {
 
 .todo-item {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px 14px;
   transition: opacity 0.2s;
+}
+
+.todo-item-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .todo-item.done {
   opacity: 0.55;
@@ -1406,7 +1412,9 @@ html, body {
 }
 
 .todo-item-title {
-  font-size: 1rem;
+  flex: 1;
+  font-size: 1.1rem;
+  font-weight: 700;
   color: var(--text);
 }
 .todo-item.done .todo-item-title {

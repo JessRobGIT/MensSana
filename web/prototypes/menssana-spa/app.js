@@ -898,11 +898,11 @@ function renderMedications () {
 
     card.innerHTML = `
       <div class="med-card-header">
-        <span class="med-name">${escapeHtml(med.name)}</span>
         <label class="med-toggle" title="${med.active ? 'Aktiv' : 'Inaktiv'}">
           <input type="checkbox" ${med.active ? 'checked' : ''}>
           <span class="med-toggle-slider"></span>
         </label>
+        <span class="med-name">${escapeHtml(med.name)}</span>
       </div>
       ${meta ? `<span class="med-meta">${escapeHtml(meta)}</span>` : ''}
       ${med.notes ? `<span class="med-notes">${escapeHtml(med.notes)}</span>` : ''}
@@ -1594,14 +1594,14 @@ function renderTodoItems () {
     if (overdue) row.classList.add('overdue')
 
     row.innerHTML = `
-      <button class="todo-check" data-id="${item.id}" aria-label="${item.status === 'done' ? 'Als offen markieren' : 'Als erledigt markieren'}">
-        ${item.status === 'done' ? '✓' : ''}
-      </button>
-      <div class="todo-item-body">
+      <div class="todo-item-header">
+        <button class="todo-check" data-id="${item.id}" aria-label="${item.status === 'done' ? 'Als offen markieren' : 'Als erledigt markieren'}">
+          ${item.status === 'done' ? '✓' : ''}
+        </button>
         <span class="todo-item-title">${escapeHtml(item.title)}</span>
-        ${dueStr ? `<span class="todo-due${overdue ? ' overdue' : ''}">${dueStr}</span>` : ''}
+        <button class="todo-edit-btn" data-id="${item.id}" aria-label="Bearbeiten">…</button>
       </div>
-      <button class="todo-edit-btn" data-id="${item.id}" aria-label="Bearbeiten">…</button>`
+      ${dueStr ? `<span class="todo-due${overdue ? ' overdue' : ''}">${dueStr}</span>` : ''}`
 
     row.querySelector('.todo-check').addEventListener('click', () => toggleTodoItem(item))
     row.querySelector('.todo-edit-btn').addEventListener('click', () => showTodoItemForm(item))
