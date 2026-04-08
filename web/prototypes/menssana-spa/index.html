@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#2d6a4f" />
   <title>MensSana</title>
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="styles.css?v=5" />
+  <link rel="stylesheet" href="styles.css?v=6" />
 </head>
 <body>
 
@@ -68,6 +68,7 @@
         <button class="btn-icon" id="todo-btn">Aufgaben</button>
         <button class="btn-icon" id="meds-btn">Medikamente</button>
         <button class="btn-icon" id="cal-btn">Kalender</button>
+        <button class="btn-icon" id="photo-btn">Fotos</button>
         <button class="btn-icon" id="settings-btn" title="Einstellungen">⚙</button>
         <button class="btn-icon" id="logout-btn">
           Abmelden
@@ -105,6 +106,16 @@
             ></textarea>
             <button id="send-btn" aria-label="Senden" disabled>Senden</button>
           </div>
+        </div>
+
+        <!-- ── PHOTOS ────────────────────────────────────── -->
+        <div id="photo-section" class="hidden">
+          <div class="meds-toolbar">
+            <button class="btn-icon" id="photo-back">← Zurück</button>
+            <h2 id="photo-section-title">Fotoalben</h2>
+          </div>
+          <div id="photo-album-grid" class="photo-album-grid"></div>
+          <div id="photo-grid" class="photo-grid hidden"></div>
         </div>
 
         <!-- ── TO-DO ──────────────────────────────────── -->
@@ -336,9 +347,20 @@
     </div>
   </div>
 
+  <!-- Foto Vollbild -->
+  <div id="photo-fullscreen" class="hidden" role="dialog" aria-modal="true" aria-label="Foto Vollbild">
+    <button class="photo-fs-close" id="photo-fs-close" aria-label="Schließen">✕</button>
+    <button class="photo-fs-nav photo-fs-prev" id="photo-fs-prev" aria-label="Vorheriges Foto">‹</button>
+    <div class="photo-fs-content">
+      <img id="photo-fs-img" src="" alt="Foto" />
+      <p id="photo-fs-caption" class="photo-fs-caption"></p>
+    </div>
+    <button class="photo-fs-nav photo-fs-next" id="photo-fs-next" aria-label="Nächstes Foto">›</button>
+  </div>
+
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=58"></script>
+  <script src="app.js?v=59"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')

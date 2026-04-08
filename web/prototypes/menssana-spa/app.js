@@ -54,6 +54,7 @@ const todoFormSave         = document.getElementById('todo-form-save')
 const todoFormCancel       = document.getElementById('todo-form-cancel')
 const todoFormArchive      = document.getElementById('todo-form-archive')
 const settingsSection  = document.getElementById('settings-section')
+const photoSection     = document.getElementById('photo-section')
 const settingsBack     = document.getElementById('settings-back')
 const settingsBtn      = document.getElementById('settings-btn')
 const settingsEmail    = document.getElementById('settings-email')
@@ -612,6 +613,7 @@ function showSection (name) {
   todoSection.classList.toggle('hidden',     name !== 'todo')
   medsSection.classList.toggle('hidden',     name !== 'meds')
   calSection.classList.toggle('hidden',      name !== 'calendar')
+  photoSection.classList.toggle('hidden',    name !== 'photo')
 }
 
 function showChatView () { showSection('chat') }
@@ -625,6 +627,169 @@ function showCalendarView () {
   showSection('calendar')
   loadCalendarFromDB().then(entries => { _calendarEntries = entries; renderCalendarView() })
 }
+
+// ── Photos ───────────────────────────────────────────────
+
+const photoBtn          = document.getElementById('photo-btn')
+const photoBack         = document.getElementById('photo-back')
+const photoSectionTitle = document.getElementById('photo-section-title')
+const photoAlbumGrid    = document.getElementById('photo-album-grid')
+const photoGrid         = document.getElementById('photo-grid')
+const photoFullscreen   = document.getElementById('photo-fullscreen')
+const photoFsImg        = document.getElementById('photo-fs-img')
+const photoFsCaption    = document.getElementById('photo-fs-caption')
+const photoFsClose      = document.getElementById('photo-fs-close')
+const photoFsPrev       = document.getElementById('photo-fs-prev')
+const photoFsNext       = document.getElementById('photo-fs-next')
+
+let _photoAlbums      = []
+let _photos           = []
+let _photoUrls        = {}   // storage_path → signedUrl
+let _currentAlbumId   = null
+let _currentPhotoIdx  = -1
+
+photoBtn.addEventListener('click', showPhotoView)
+
+photoBack.addEventListener('click', () => {
+  if (_currentAlbumId) {
+    _currentAlbumId = null
+    photoGrid.classList.add('hidden')
+    photoAlbumGrid.classList.remove('hidden')
+    photoSectionTitle.textContent = 'Fotoalben'
+  } else {
+    showSection('chat')
+  }
+})
+
+async function showPhotoView () {
+  showSection('photo')
+  _currentAlbumId = null
+  photoGrid.classList.add('hidden')
+  photoAlbumGrid.innerHTML = '<p class="photo-empty">Wird geladen…</p>'
+  photoAlbumGrid.classList.remove('hidden')
+  photoSectionTitle.textContent = 'Fotoalben'
+  await loadAndRenderAlbums()
+}
+
+async function loadAndRenderAlbums () {
+  if (!currentUser) return
+  const { data: albums } = await sb.from('photo_albums')
+    .select('id, name')
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: true })
+  _photoAlbums = albums ?? []
+
+  if (!_photoAlbums.length) {
+    photoAlbumGrid.innerHTML = '<p class="photo-empty">Noch keine Fotoalben vorhanden.<br>Ihre Betreuungsperson kann Alben anlegen.</p>'
+    return
+  }
+
+  // Photo count per album
+  const { data: allPhotos } = await sb.from('photos')
+    .select('album_id, storage_path')
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: true })
+
+  const countMap   = {}
+  const previewMap = {}
+  allPhotos?.forEach(p => {
+    countMap[p.album_id] = (countMap[p.album_id] ?? 0) + 1
+    if (!previewMap[p.album_id]) previewMap[p.album_id] = p.storage_path
+  })
+
+  // Signed URLs for preview thumbnails
+  const previewPaths = Object.values(previewMap).filter(Boolean)
+  if (previewPaths.length) {
+    const { data: urls } = await sb.storage.from('photos').createSignedUrls(previewPaths, 3600)
+    urls?.forEach(u => { if (u.signedUrl) _photoUrls[u.path] = u.signedUrl })
+  }
+
+  photoAlbumGrid.innerHTML = ''
+  _photoAlbums.forEach(album => {
+    const previewPath = previewMap[album.id]
+    const previewUrl  = previewPath ? _photoUrls[previewPath] : null
+    const count = countMap[album.id] ?? 0
+    const card  = document.createElement('div')
+    card.className = 'photo-album-card'
+    card.innerHTML = `
+      <div class="photo-album-thumb"${previewUrl ? ` style="background-image:url('${previewUrl}')"` : ''}>
+        ${previewUrl ? '' : '🖼'}
+      </div>
+      <div class="photo-album-info">
+        <span class="photo-album-name">${escapeHtml(album.name)}</span>
+        <span class="photo-album-count">${count} ${count === 1 ? 'Foto' : 'Fotos'}</span>
+      </div>`
+    card.addEventListener('click', () => openPhotoAlbum(album.id, album.name))
+    photoAlbumGrid.appendChild(card)
+  })
+}
+
+async function openPhotoAlbum (albumId, albumName) {
+  _currentAlbumId = albumId
+  photoSectionTitle.textContent = albumName
+  photoAlbumGrid.classList.add('hidden')
+  photoGrid.innerHTML = '<p class="photo-empty">Wird geladen…</p>'
+  photoGrid.classList.remove('hidden')
+
+  const { data } = await sb.from('photos')
+    .select('id, storage_path, caption')
+    .eq('album_id', albumId)
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: true })
+  _photos = data ?? []
+
+  if (!_photos.length) {
+    photoGrid.innerHTML = '<p class="photo-empty">Dieses Album ist noch leer.</p>'
+    return
+  }
+
+  const paths = _photos.map(p => p.storage_path)
+  const { data: urls } = await sb.storage.from('photos').createSignedUrls(paths, 3600)
+  urls?.forEach(u => { if (u.signedUrl) _photoUrls[u.path] = u.signedUrl })
+
+  photoGrid.innerHTML = ''
+  _photos.forEach((photo, idx) => {
+    const url = _photoUrls[photo.storage_path]
+    if (!url) return
+    const thumb = document.createElement('div')
+    thumb.className = 'photo-thumb'
+    thumb.style.backgroundImage = `url('${url}')`
+    thumb.title = photo.caption || ''
+    thumb.addEventListener('click', () => openPhotoFullscreen(idx))
+    photoGrid.appendChild(thumb)
+  })
+}
+
+function openPhotoFullscreen (idx) {
+  _currentPhotoIdx = idx
+  renderPhotoFullscreen()
+  photoFullscreen.classList.remove('hidden')
+}
+
+function renderPhotoFullscreen () {
+  const photo = _photos[_currentPhotoIdx]
+  if (!photo) return
+  photoFsImg.src = _photoUrls[photo.storage_path] ?? ''
+  photoFsCaption.textContent = photo.caption || ''
+  photoFsPrev.style.visibility = _currentPhotoIdx > 0 ? 'visible' : 'hidden'
+  photoFsNext.style.visibility = _currentPhotoIdx < _photos.length - 1 ? 'visible' : 'hidden'
+}
+
+photoFsClose.addEventListener('click', () => photoFullscreen.classList.add('hidden'))
+photoFsPrev.addEventListener('click', () => {
+  if (_currentPhotoIdx > 0) { _currentPhotoIdx--; renderPhotoFullscreen() }
+})
+photoFsNext.addEventListener('click', () => {
+  if (_currentPhotoIdx < _photos.length - 1) { _currentPhotoIdx++; renderPhotoFullscreen() }
+})
+document.addEventListener('keydown', e => {
+  if (photoFullscreen.classList.contains('hidden')) return
+  if (e.key === 'Escape')     photoFullscreen.classList.add('hidden')
+  if (e.key === 'ArrowLeft' && _currentPhotoIdx > 0)
+    { _currentPhotoIdx--; renderPhotoFullscreen() }
+  if (e.key === 'ArrowRight' && _currentPhotoIdx < _photos.length - 1)
+    { _currentPhotoIdx++; renderPhotoFullscreen() }
+})
 
 // ── Settings ─────────────────────────────────────────────
 

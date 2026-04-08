@@ -113,6 +113,14 @@
             <div id="dash-msg-thread" class="dash-msg-thread"></div>
           </div>
 
+          <div class="detail-card detail-card-full">
+            <h3>Fotoalben
+              <button class="detail-add-btn" id="dash-photo-album-btn">+ Album</button>
+              <button class="detail-add-btn" id="dash-photo-upload-btn">↑ Foto</button>
+            </h3>
+            <div id="dash-photo-content" class="dash-photo-content"></div>
+          </div>
+
         </div>
       </section>
 
@@ -279,6 +287,45 @@
         <button class="btn btn-secondary" id="dash-msg-cancel">Abbrechen</button>
       </div>
       <p class="settings-status" id="dash-msg-status"></p>
+    </div>
+  </div>
+
+  <!-- Album erstellen -->
+  <div id="dash-album-overlay" class="dash-form-overlay hidden" role="dialog" aria-modal="true">
+    <div class="dash-form-card">
+      <h3>Neues Album erstellen</h3>
+      <div class="form-group">
+        <label for="dash-album-name">Albumname *</label>
+        <input id="dash-album-name" type="text" placeholder="z.B. Familie, Urlaub, Früher" />
+      </div>
+      <div class="dash-form-actions">
+        <button class="btn btn-primary"   id="dash-album-save">Erstellen</button>
+        <button class="btn btn-secondary" id="dash-album-cancel">Abbrechen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Foto hochladen -->
+  <div id="dash-photo-overlay" class="dash-form-overlay hidden" role="dialog" aria-modal="true">
+    <div class="dash-form-card">
+      <h3>Foto hochladen</h3>
+      <div class="form-group">
+        <label for="dash-photo-album-select">Album</label>
+        <select id="dash-photo-album-select" class="form-select"></select>
+      </div>
+      <div class="form-group">
+        <label for="dash-photo-file">Foto(s) wählen</label>
+        <input id="dash-photo-file" type="file" accept="image/*" multiple />
+      </div>
+      <div class="form-group">
+        <label for="dash-photo-caption">Beschriftung (optional)</label>
+        <input id="dash-photo-caption" type="text" placeholder="z.B. Weihnachten 2023" />
+      </div>
+      <div class="dash-form-actions">
+        <button class="btn btn-primary"   id="dash-photo-save">Hochladen</button>
+        <button class="btn btn-secondary" id="dash-photo-cancel">Abbrechen</button>
+      </div>
+      <p class="settings-status" id="dash-photo-status"></p>
     </div>
   </div>
 

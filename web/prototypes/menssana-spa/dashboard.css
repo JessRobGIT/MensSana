@@ -736,3 +736,79 @@ body {
   margin-top: 4px;
   text-align: right;
 }
+
+/* ── PHOTOS (dashboard) ─────────────────────────────────── */
+
+.dash-photo-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dash-photo-album-section { }
+
+.dash-photo-album-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.dash-photo-album-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+.dash-photo-album-delete {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 2px 6px;
+}
+.dash-photo-album-delete:hover { color: var(--danger); }
+
+.dash-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 6px;
+}
+.dash-photo-thumb-wrap {
+  position: relative;
+}
+.dash-photo-thumb {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  display: block;
+}
+.dash-photo-delete {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  background: rgba(0,0,0,0.55);
+  border: none;
+  color: #fff;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.dash-photo-thumb-wrap:hover .dash-photo-delete { opacity: 1; }
+.dash-photo-caption {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 3px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

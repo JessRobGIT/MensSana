@@ -53,6 +53,21 @@ const dashMsgSave      = document.getElementById('dash-msg-save')
 const dashMsgCancel    = document.getElementById('dash-msg-cancel')
 const dashMsgStatus    = document.getElementById('dash-msg-status')
 
+const dashPhotoContent     = document.getElementById('dash-photo-content')
+const dashPhotoAlbumBtn    = document.getElementById('dash-photo-album-btn')
+const dashPhotoUploadBtn   = document.getElementById('dash-photo-upload-btn')
+const dashAlbumOverlay     = document.getElementById('dash-album-overlay')
+const dashAlbumName        = document.getElementById('dash-album-name')
+const dashAlbumSave        = document.getElementById('dash-album-save')
+const dashAlbumCancel      = document.getElementById('dash-album-cancel')
+const dashPhotoOverlay     = document.getElementById('dash-photo-overlay')
+const dashPhotoAlbumSelect = document.getElementById('dash-photo-album-select')
+const dashPhotoFile        = document.getElementById('dash-photo-file')
+const dashPhotoCaption     = document.getElementById('dash-photo-caption')
+const dashPhotoSave        = document.getElementById('dash-photo-save')
+const dashPhotoCancel      = document.getElementById('dash-photo-cancel')
+const dashPhotoStatus      = document.getElementById('dash-photo-status')
+
 // ── Helpers ───────────────────────────────────────────────
 function isoDate (d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
@@ -420,11 +435,12 @@ async function showDetail (userId, name) {
   detailName.textContent = name
 
   // Clear previous content
-  document.getElementById('mood-chart').innerHTML  = '<span class="detail-empty">Wird geladen …</span>'
-  document.getElementById('conv-list').innerHTML   = '<span class="detail-empty">Wird geladen …</span>'
-  document.getElementById('meds-list').innerHTML   = '<span class="detail-empty">Wird geladen …</span>'
-  document.getElementById('events-list').innerHTML = '<span class="detail-empty">Wird geladen …</span>'
-  dashMsgThread.innerHTML                          = '<span class="detail-empty">Wird geladen …</span>'
+  document.getElementById('mood-chart').innerHTML      = '<span class="detail-empty">Wird geladen …</span>'
+  document.getElementById('conv-list').innerHTML       = '<span class="detail-empty">Wird geladen …</span>'
+  document.getElementById('meds-list').innerHTML       = '<span class="detail-empty">Wird geladen …</span>'
+  document.getElementById('events-list').innerHTML     = '<span class="detail-empty">Wird geladen …</span>'
+  dashMsgThread.innerHTML                              = '<span class="detail-empty">Wird geladen …</span>'
+  document.getElementById('dash-photo-content').innerHTML = '<span class="detail-empty">Wird geladen …</span>'
 
   // Load all data in parallel
   const today = new Date()
@@ -462,6 +478,7 @@ async function showDetail (userId, name) {
   renderDashCalendar(eventsRes.data ?? [])
   await loadAndRenderDashTodos(userId)
   await loadAndRenderMessages(userId)
+  await loadAndRenderPhotos(userId)
 }
 
 function renderMoodChart (entries) {
@@ -1071,5 +1088,160 @@ dashMsgSave?.addEventListener('click', async () => {
   } else {
     dashMsgOverlay.classList.add('hidden')
     await loadAndRenderMessages(_detailUserId)
+  }
+})
+
+// ── Photos ────────────────────────────────────────────────
+
+let _dashPhotoAlbums = []   // albums for current patient
+let _dashPhotoUrls   = {}   // storage_path → signedUrl
+
+async function loadAndRenderPhotos (userId) {
+  const el = dashPhotoContent
+  el.innerHTML = '<span class="detail-empty">Wird geladen …</span>'
+
+  const { data: albums } = await sb.from('photo_albums')
+    .select('id, name')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+  _dashPhotoAlbums = albums ?? []
+
+  if (!_dashPhotoAlbums.length) {
+    el.innerHTML = '<span class="detail-empty">Noch keine Alben. Klicken Sie auf "+ Album" um zu beginnen.</span>'
+    return
+  }
+
+  const { data: allPhotos } = await sb.from('photos')
+    .select('id, album_id, storage_path, caption')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+  const photosByAlbum = {}
+  allPhotos?.forEach(p => {
+    ;(photosByAlbum[p.album_id] ??= []).push(p)
+  })
+
+  // Signed URLs for all photos
+  const allPaths = allPhotos?.map(p => p.storage_path) ?? []
+  if (allPaths.length) {
+    const { data: urls } = await sb.storage.from('photos').createSignedUrls(allPaths, 3600)
+    urls?.forEach(u => { if (u.signedUrl) _dashPhotoUrls[u.path] = u.signedUrl })
+  }
+
+  el.innerHTML = ''
+  _dashPhotoAlbums.forEach(album => {
+    const photos = photosByAlbum[album.id] ?? []
+    const section = document.createElement('div')
+    section.className = 'dash-photo-album-section'
+    section.innerHTML = `
+      <div class="dash-photo-album-header">
+        <span class="dash-photo-album-title">📁 ${escHtml(album.name)} (${photos.length})</span>
+        <button class="dash-photo-album-delete" data-album-id="${album.id}" title="Album löschen">✕</button>
+      </div>
+      <div class="dash-photo-grid" id="dash-pgrid-${album.id}"></div>`
+
+    section.querySelector('.dash-photo-album-delete').addEventListener('click', async () => {
+      if (!confirm(`Album „${album.name}" und alle Fotos darin löschen?`)) return
+      // Delete storage objects first
+      if (photos.length) {
+        await sb.storage.from('photos').remove(photos.map(p => p.storage_path))
+      }
+      await sb.from('photo_albums').delete().eq('id', album.id)
+      await loadAndRenderPhotos(userId)
+    })
+
+    el.appendChild(section)
+
+    const grid = document.getElementById(`dash-pgrid-${album.id}`)
+    if (!photos.length) {
+      grid.innerHTML = '<span class="detail-empty" style="font-size:0.82rem">Keine Fotos</span>'
+      return
+    }
+    photos.forEach(photo => {
+      const url = _dashPhotoUrls[photo.storage_path]
+      if (!url) return
+      const wrap = document.createElement('div')
+      wrap.className = 'dash-photo-thumb-wrap'
+      wrap.innerHTML = `
+        <img class="dash-photo-thumb" src="${url}" alt="${escHtml(photo.caption || '')}" title="${escHtml(photo.caption || '')}" />
+        ${photo.caption ? `<div class="dash-photo-caption">${escHtml(photo.caption)}</div>` : ''}
+        <button class="dash-photo-delete" data-photo-id="${photo.id}" data-path="${escHtml(photo.storage_path)}" title="Foto löschen">✕</button>`
+      wrap.querySelector('.dash-photo-delete').addEventListener('click', async () => {
+        await sb.storage.from('photos').remove([photo.storage_path])
+        await sb.from('photos').delete().eq('id', photo.id)
+        await loadAndRenderPhotos(userId)
+      })
+      grid.appendChild(wrap)
+    })
+  })
+}
+
+// Album erstellen
+dashPhotoAlbumBtn?.addEventListener('click', () => {
+  dashAlbumName.value = ''
+  dashAlbumOverlay.classList.remove('hidden')
+  dashAlbumName.focus()
+})
+dashAlbumCancel?.addEventListener('click', () => dashAlbumOverlay.classList.add('hidden'))
+dashAlbumSave?.addEventListener('click', async () => {
+  const name = dashAlbumName.value.trim()
+  if (!name || !_detailUserId) { dashAlbumName.focus(); return }
+  const { error } = await sb.from('photo_albums').insert({
+    user_id:    _detailUserId,
+    name,
+    created_by: _caregiverId,
+  })
+  dashAlbumOverlay.classList.add('hidden')
+  if (!error) await loadAndRenderPhotos(_detailUserId)
+})
+
+// Foto hochladen
+dashPhotoUploadBtn?.addEventListener('click', () => {
+  if (!_dashPhotoAlbums.length) {
+    alert('Bitte zuerst ein Album erstellen.')
+    return
+  }
+  dashPhotoAlbumSelect.innerHTML = _dashPhotoAlbums
+    .map(a => `<option value="${a.id}">${escHtml(a.name)}</option>`).join('')
+  dashPhotoFile.value     = ''
+  dashPhotoCaption.value  = ''
+  dashPhotoStatus.textContent = ''
+  dashPhotoOverlay.classList.remove('hidden')
+})
+dashPhotoCancel?.addEventListener('click', () => dashPhotoOverlay.classList.add('hidden'))
+dashPhotoSave?.addEventListener('click', async () => {
+  const files   = dashPhotoFile.files
+  const albumId = dashPhotoAlbumSelect.value
+  const caption = dashPhotoCaption.value.trim() || null
+  if (!files?.length || !albumId || !_detailUserId) {
+    dashPhotoStatus.textContent = 'Bitte ein Foto und ein Album wählen.'
+    return
+  }
+  dashPhotoSave.disabled = true
+  dashPhotoStatus.textContent = 'Wird hochgeladen…'
+
+  let uploaded = 0
+  for (const file of files) {
+    const ext  = file.name.split('.').pop().toLowerCase()
+    const path = `${_detailUserId}/${albumId}/${crypto.randomUUID()}.${ext}`
+    const { error: uploadErr } = await sb.storage.from('photos').upload(path, file, {
+      contentType: file.type,
+      upsert: false,
+    })
+    if (uploadErr) { dashPhotoStatus.textContent = 'Upload-Fehler: ' + uploadErr.message; break }
+    const { error: dbErr } = await sb.from('photos').insert({
+      album_id:     albumId,
+      user_id:      _detailUserId,
+      storage_path: path,
+      caption:      caption,
+      created_by:   _caregiverId,
+    })
+    if (dbErr) { dashPhotoStatus.textContent = 'Datenbankfehler: ' + dbErr.message; break }
+    uploaded++
+  }
+
+  dashPhotoSave.disabled = false
+  if (uploaded === files.length) {
+    dashPhotoOverlay.classList.add('hidden')
+    await loadAndRenderPhotos(_detailUserId)
   }
 })
