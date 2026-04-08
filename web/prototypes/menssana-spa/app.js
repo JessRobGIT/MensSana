@@ -44,7 +44,6 @@ const todoBack       = document.getElementById('todo-back')
 const todoAddListBtn = document.getElementById('todo-add-list-btn')
 const todoListsBar   = document.getElementById('todo-lists-bar')
 const todoItemsList  = document.getElementById('todo-items-list')
-const todoNewTitle   = document.getElementById('todo-new-title')
 const todoAddItemBtn = document.getElementById('todo-add-item-btn')
 const todoFormOverlay      = document.getElementById('todo-form-overlay')
 const todoFormTitleEl      = document.getElementById('todo-form-title')
@@ -1612,13 +1611,7 @@ todoAddListBtn.addEventListener('click', async () => {
   await loadAndRenderTodoItems()
 })
 
-todoNewTitle.addEventListener('input', () => {
-  todoAddItemBtn.disabled = !todoNewTitle.value.trim()
-})
-todoNewTitle.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && todoNewTitle.value.trim()) addTodoItem()
-})
-todoAddItemBtn.addEventListener('click', addTodoItem)
+todoAddItemBtn.addEventListener('click', showNewTodoItemForm)
 
 todoFormSave.addEventListener('click', saveTodoItemForm)
 todoFormCancel.addEventListener('click', hideTodoForm)
@@ -1720,23 +1713,6 @@ function renderTodoItems () {
   })
 }
 
-async function addTodoItem () {
-  const title = todoNewTitle.value.trim()
-  if (!title || !_activeListId) return
-  const { data, error } = await sb.from('todo_items')
-    .insert([{
-      list_id:    _activeListId,
-      user_id:    currentUser.id,
-      title,
-      created_by: currentUser.id,
-    }])
-    .select('id, title, notes, status, due_at, created_by').single()
-  if (error || !data) { showBanner('Aufgabe konnte nicht gespeichert werden.', true); return }
-  todoNewTitle.value = ''
-  todoAddItemBtn.disabled = true
-  _todoItems.push(data)
-  renderTodoItems()
-}
 
 async function toggleTodoItem (item) {
   const newStatus = item.status === 'done' ? 'open' : 'done'
@@ -1751,13 +1727,26 @@ async function toggleTodoItem (item) {
   loadTodoReminder()   // update overdue count in banner
 }
 
+function showNewTodoItemForm () {
+  _editingTodoId = null
+  todoFormTitleEl.textContent = 'Aufgabe hinzufügen'
+  todoFormTitleInput.value = ''
+  todoFormNotes.value = ''
+  todoFormDue.value = ''
+  todoFormList.innerHTML = _todoLists.map(l =>
+    `<option value="${l.id}"${l.id === _activeListId ? ' selected' : ''}>${escapeHtml(l.name)}</option>`
+  ).join('')
+  todoFormArchive.style.display = 'none'
+  todoFormOverlay.classList.remove('hidden')
+  todoFormTitleInput.focus()
+}
+
 function showTodoItemForm (item) {
   _editingTodoId = item.id
   todoFormTitleEl.textContent = 'Aufgabe bearbeiten'
   todoFormTitleInput.value = item.title
   todoFormNotes.value = item.notes ?? ''
   todoFormDue.value = item.due_at ? isoDate(new Date(item.due_at)) : ''
-  // Populate list selector
   todoFormList.innerHTML = _todoLists.map(l =>
     `<option value="${l.id}"${l.id === _activeListId ? ' selected' : ''}>${escapeHtml(l.name)}</option>`
   ).join('')
@@ -1777,17 +1766,27 @@ async function saveTodoItemForm () {
   const newListId = todoFormList.value
   const payload = {
     title,
-    notes:  todoFormNotes.value.trim() || null,
-    due_at: todoFormDue.value ? `${todoFormDue.value}T12:00:00Z` : null,
+    notes:   todoFormNotes.value.trim() || null,
+    due_at:  todoFormDue.value ? `${todoFormDue.value}T12:00:00Z` : null,
     list_id: newListId,
   }
-  const { error } = await sb.from('todo_items').update(payload)
-    .eq('id', _editingTodoId).eq('user_id', currentUser.id)
-  if (error) { showBanner('Speichern fehlgeschlagen.', true); return }
+
+  if (_editingTodoId === null) {
+    // Create new
+    const { error } = await sb.from('todo_items')
+      .insert([{ ...payload, user_id: currentUser.id, created_by: currentUser.id }])
+    if (error) { showBanner('Aufgabe konnte nicht gespeichert werden.', true); return }
+  } else {
+    // Update existing
+    const { error } = await sb.from('todo_items').update(payload)
+      .eq('id', _editingTodoId).eq('user_id', currentUser.id)
+    if (error) { showBanner('Speichern fehlgeschlagen.', true); return }
+  }
+
   hideTodoForm()
-  // Reload — item may have moved to a different list
   if (newListId !== _activeListId) _activeListId = newListId
   await loadAndRenderTodoItems()
+  loadTodoReminder()
 }
 
 async function archiveTodoItem () {

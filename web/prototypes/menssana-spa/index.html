@@ -166,16 +166,11 @@
           <div class="meds-toolbar">
             <button class="btn-icon" id="todo-back">← Chat</button>
             <h2>Meine Aufgaben</h2>
+            <button class="btn-icon" id="todo-add-item-btn">+ Aufgabe</button>
             <button class="btn-icon" id="todo-add-list-btn">+ Liste</button>
           </div>
           <div id="todo-lists-bar" class="todo-lists-bar"></div>
           <div id="todo-items-list" class="todo-items-list"></div>
-          <div class="todo-input-bar">
-            <input id="todo-new-title" type="text"
-                   placeholder="Neue Aufgabe eingeben …"
-                   autocomplete="off" />
-            <button id="todo-add-item-btn" disabled>+</button>
-          </div>
         </div>
 
         <div id="meds-section" class="hidden">
@@ -370,7 +365,7 @@
 
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=61"></script>
+  <script src="app.js?v=62"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')
