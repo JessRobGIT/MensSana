@@ -709,7 +709,8 @@ html, body {
 }
 
 /* Medication form modal */
-#med-form-overlay {
+#med-form-overlay,
+#todo-form-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.5);
@@ -722,6 +723,7 @@ html, body {
 }
 
 #med-form-overlay.hidden { display: none; }
+#todo-form-overlay.hidden { display: none; }
 
 .med-form-card {
   background: var(--surface);
