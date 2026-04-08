@@ -14,6 +14,8 @@ let appInitialized      = false
 let _medications        = []
 let _editingMedId       = null
 let _caregivers         = []   // [{ id, name }] — assigned caregivers of the current user
+let _dismissedReminders = new Set()  // keys: "med-{id}" / "cal-{id}", reset on new day
+let _dismissedDate      = ''         // YYYY-MM-DD — reset _dismissedReminders on date change
 
 // ── DOM refs ─────────────────────────────────────────────
 const loginView        = document.getElementById('login-view')
@@ -100,6 +102,12 @@ const calRecurringInput = document.getElementById('cal-recurring')
 const calEndGroup       = document.getElementById('cal-end-group')
 const calEndDateInput   = document.getElementById('cal-end-date')
 const calNotesInput     = document.getElementById('cal-notes')
+const reminderToast        = document.getElementById('reminder-toast')
+const reminderToastIcon    = document.getElementById('reminder-toast-icon')
+const reminderToastTitle   = document.getElementById('reminder-toast-title')
+const reminderToastDetail  = document.getElementById('reminder-toast-detail')
+const reminderToastDismiss = document.getElementById('reminder-toast-dismiss')
+
 const medFormOverlay = document.getElementById('med-form-overlay')
 const medFormTitle   = document.getElementById('med-form-title')
 const medFormSave    = document.getElementById('med-form-save')
@@ -136,6 +144,104 @@ function isNetworkError (err) {
   return err?.message?.toLowerCase().includes('fetch') ||
          err?.message?.toLowerCase().includes('network')
 }
+
+// ── Reminders ────────────────────────────────────────────
+function startReminderPolling () {
+  checkReminders()
+  setInterval(checkReminders, 60 * 1000)
+}
+
+function checkReminders () {
+  const now      = new Date()
+  const todayStr = isoDate(now)
+
+  // Reset dismissed set at midnight
+  if (_dismissedDate !== todayStr) {
+    _dismissedReminders = new Set()
+    _dismissedDate      = todayStr
+  }
+
+  const nowMins = now.getHours() * 60 + now.getMinutes()
+  const pending = []
+
+  // Active daily medications due in the next 30 minutes
+  _medications
+    .filter(m => m.active && m.frequency === 'daily')
+    .forEach(med => {
+      const id = `med-${med.id}`
+      if (_dismissedReminders.has(id)) return
+      const [h, m] = med.time.split(':').map(Number)
+      const diff = (h * 60 + m) - nowMins
+      if (diff >= 0 && diff <= 30) {
+        pending.push({
+          id,
+          icon:   '💊',
+          title:  diff === 0 ? 'Medikament jetzt fällig'
+                             : `Medikament in ${diff} Minute${diff === 1 ? '' : 'n'}`,
+          detail: med.name + (med.dosage ? ' · ' + med.dosage : '') + ` um ${med.time} Uhr`,
+        })
+      }
+    })
+
+  // Calendar events today (not all-day) due in the next 60 minutes
+  _calendarEntries
+    .filter(e => !e.allDay && e.date === todayStr)
+    .forEach(event => {
+      const id = `cal-${event.id}`
+      if (_dismissedReminders.has(id)) return
+      const [h, m] = event.time.split(':').map(Number)
+      const diff = (h * 60 + m) - nowMins
+      if (diff >= 0 && diff <= 60) {
+        pending.push({
+          id,
+          icon:   '📅',
+          title:  diff === 0 ? 'Termin jetzt'
+                             : `Termin in ${diff} Minute${diff === 1 ? '' : 'n'}`,
+          detail: event.title + ` um ${event.time} Uhr`,
+        })
+      }
+    })
+
+  if (!pending.length) {
+    reminderToast.classList.add('hidden')
+    return
+  }
+
+  const r = pending[0]
+  reminderToastIcon.textContent   = r.icon
+  reminderToastTitle.textContent  = r.title
+  reminderToastDetail.textContent = r.detail
+  reminderToast.dataset.reminderId = r.id
+  reminderToast.classList.remove('hidden')
+  reminderToast.style.animation = 'none'
+  requestAnimationFrame(() => { reminderToast.style.animation = '' })
+  playReminderSound()
+}
+
+function playReminderSound () {
+  try {
+    const ctx  = new AudioContext()
+    const osc  = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(523, ctx.currentTime)       // C5
+    osc.frequency.setValueAtTime(659, ctx.currentTime + 0.15) // E5
+    gain.gain.setValueAtTime(0.25, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.6)
+  } catch (_) { /* audio not available */ }
+}
+
+reminderToastDismiss.addEventListener('click', () => {
+  const id = reminderToast.dataset.reminderId
+  if (id) _dismissedReminders.add(id)
+  reminderToast.classList.add('hidden')
+  // Check again immediately so next pending reminder shows
+  setTimeout(checkReminders, 100)
+})
 
 // ── Offline queue ─────────────────────────────────────────
 // Each item: { convId, text, el }  (el = DOM node with .pending class)
@@ -221,6 +327,11 @@ async function initApp (user) {
   setInterval(loadTodoReminder, 60 * 60 * 1000)  // refresh every hour
   loadCaregivers()        // non-blocking — needed for delegation feature
   loadIncomingMessages()  // non-blocking — show unread caregiver messages
+  // Load data for reminders, then start 1-min polling
+  Promise.all([
+    loadMedicationsFromDB().then(meds => { _medications = meds }),
+    loadCalendarFromDB().then(entries => { _calendarEntries = entries }),
+  ]).then(() => startReminderPolling())
 }
 
 async function ensureProfile (user) {

@@ -1,11 +1,11 @@
 // MensSana — Service Worker
 // Caches app shell for offline use. Chat requires network.
 
-const CACHE = 'menssana-v22'
+const CACHE = 'menssana-v23'
 const ASSETS = [
   '/MensSana/',
   '/MensSana/index.html',
-  '/MensSana/styles.css?v=6',
+  '/MensSana/styles.css?v=7',
   '/MensSana/app.js',
   '/MensSana/supabase.min.js',
   '/MensSana/manifest.json',

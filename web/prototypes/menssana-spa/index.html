@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#2d6a4f" />
   <title>MensSana</title>
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="styles.css?v=6" />
+  <link rel="stylesheet" href="styles.css?v=7" />
 </head>
 <body>
 
@@ -347,6 +347,16 @@
     </div>
   </div>
 
+  <!-- Erinnerung Toast -->
+  <div id="reminder-toast" class="reminder-toast hidden" role="alert" aria-live="assertive">
+    <span id="reminder-toast-icon" class="reminder-toast-icon"></span>
+    <div class="reminder-toast-body">
+      <strong id="reminder-toast-title"></strong>
+      <span id="reminder-toast-detail"></span>
+    </div>
+    <button id="reminder-toast-dismiss" class="reminder-toast-dismiss">Danke</button>
+  </div>
+
   <!-- Foto Vollbild -->
   <div id="photo-fullscreen" class="hidden" role="dialog" aria-modal="true" aria-label="Foto Vollbild">
     <button class="photo-fs-close" id="photo-fs-close" aria-label="Schließen">✕</button>
@@ -360,7 +370,7 @@
 
   <!-- Supabase JS v2 (lokal, kein CDN) -->
   <script src="supabase.min.js"></script>
-  <script src="app.js?v=60"></script>
+  <script src="app.js?v=61"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/MensSana/sw.js')

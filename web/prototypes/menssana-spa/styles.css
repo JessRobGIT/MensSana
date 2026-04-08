@@ -1763,3 +1763,53 @@ html, body {
 .photo-fs-nav:hover { background: rgba(255,255,255,0.28); }
 .photo-fs-prev { left: 12px; }
 .photo-fs-next { right: 12px; }
+
+/* ── Reminder Toast ──────────────────────────────────────── */
+.reminder-toast {
+  position: fixed;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  background: var(--green);
+  color: #fff;
+  border-radius: 14px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.22);
+  max-width: 420px;
+  width: calc(100% - 32px);
+  animation: reminderSlideDown 0.3s ease;
+}
+.reminder-toast.hidden { display: none; }
+
+@keyframes reminderSlideDown {
+  from { opacity: 0; transform: translateX(-50%) translateY(-16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.reminder-toast-icon { font-size: 1.6rem; flex-shrink: 0; }
+
+.reminder-toast-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.reminder-toast-body strong { font-size: 0.95rem; }
+.reminder-toast-body span   { font-size: 0.85rem; opacity: 0.9; }
+
+.reminder-toast-dismiss {
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.45);
+  color: #fff;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.reminder-toast-dismiss:hover { background: rgba(255,255,255,0.35); }
