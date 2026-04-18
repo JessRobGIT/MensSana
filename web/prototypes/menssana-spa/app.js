@@ -14,8 +14,9 @@ let appInitialized      = false
 let _medications        = []
 let _editingMedId       = null
 let _caregivers         = []   // [{ id, name }] — assigned caregivers of the current user
-let _dismissedReminders = new Set()  // keys: "med-{id}" / "cal-{id}", reset on new day
-let _dismissedDate      = ''         // YYYY-MM-DD — reset _dismissedReminders on date change
+let _dismissedReminders   = new Set()  // keys: "med-{id}" / "cal-{id}" / "todo-{id}", reset on new day
+let _dismissedDate        = ''         // YYYY-MM-DD — reset _dismissedReminders on date change
+let _dueTodosForReminder  = []         // cache populated by loadTodoReminder()
 
 // ── DOM refs ─────────────────────────────────────────────
 const loginView        = document.getElementById('login-view')
@@ -200,6 +201,18 @@ function checkReminders () {
         })
       }
     })
+
+  // Todos due today or overdue
+  _dueTodosForReminder.forEach(todo => {
+    const id = `todo-${todo.id}`
+    if (_dismissedReminders.has(id)) return
+    pending.push({
+      id,
+      icon:   '📋',
+      title:  'Aufgabe fällig',
+      detail: todo.title,
+    })
+  })
 
   if (!pending.length) {
     reminderToast.classList.add('hidden')
@@ -1973,11 +1986,12 @@ async function loadTodoReminder () {
   if (!currentUser) return
   const today = isoDate(new Date())
   const { data } = await sb.from('todo_items')
-    .select('id, list_id')
+    .select('id, title, list_id')
     .eq('user_id', currentUser.id)
     .eq('status', 'open')
     .lte('due_at', today + 'T23:59:59Z')
     .limit(10)
+  _dueTodosForReminder = data ?? []
   const count = data?.length ?? 0
   const bar = document.getElementById('todo-reminder-bar')
   if (!bar) return
