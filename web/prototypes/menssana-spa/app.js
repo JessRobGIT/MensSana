@@ -122,9 +122,14 @@ const medNotesInput  = document.getElementById('med-notes')
 
 let _signupMode = false
 
+const consentGroup    = document.getElementById('consent-group')
+const consentCheckbox = document.getElementById('consent-checkbox')
+
 function enterSignupMode () {
   _signupMode = true
   nameGroup.classList.remove('hidden')
+  consentGroup.classList.remove('hidden')
+  consentCheckbox.checked = false
   nameInput.focus()
   signupBtn.textContent = 'Registrieren'
   backToLoginBtn.style.display = ''
@@ -134,6 +139,8 @@ function enterSignupMode () {
 function exitSignupMode () {
   _signupMode = false
   nameGroup.classList.add('hidden')
+  consentGroup.classList.add('hidden')
+  consentCheckbox.checked = false
   nameInput.value = ''
   signupBtn.textContent = 'Neues Konto erstellen'
   backToLoginBtn.style.display = 'none'
@@ -457,6 +464,10 @@ signupBtn.addEventListener('click', async () => {
   }
   if (password.length < 6) {
     setLoginStatus('Das Passwort muss mindestens 6 Zeichen haben.', true)
+    return
+  }
+  if (!consentCheckbox.checked) {
+    setLoginStatus('Bitte stimmen Sie der Datenschutzerklärung zu.', true)
     return
   }
 
