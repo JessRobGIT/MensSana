@@ -812,3 +812,41 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── Invite ──────────────────────────────────────────────── */
+.detail-invite-btn {
+  margin-left: auto;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  background: transparent;
+  border: 1.5px solid var(--green);
+  color: var(--green);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.detail-invite-btn:hover { background: var(--green-pale); }
+
+.invite-patient-label { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 12px; }
+.invite-result-label  { font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; }
+
+.invite-link-box {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+.invite-link-box code { font-size: 0.82rem; color: var(--green); }
+
+.btn-outline-small {
+  background: transparent;
+  border: 1.5px solid var(--green);
+  color: var(--green);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.btn-outline-small:hover { background: var(--green-pale); }
+.invite-copy-hint { font-size: 0.82rem; color: var(--text-muted); margin-top: 6px; }

@@ -132,12 +132,19 @@ let _signupMode = false
 
 const consentGroup    = document.getElementById('consent-group')
 const consentCheckbox = document.getElementById('consent-checkbox')
+const inviteGroup     = document.getElementById('invite-group')
+const inviteCodeInput = document.getElementById('invite-code')
+
+// Pre-fill invite code from URL ?invite= param
+const _urlInviteCode  = new URLSearchParams(window.location.search).get('invite')
 
 function enterSignupMode () {
   _signupMode = true
   nameGroup.classList.remove('hidden')
+  inviteGroup.classList.remove('hidden')
   consentGroup.classList.remove('hidden')
   consentCheckbox.checked = false
+  if (_urlInviteCode) inviteCodeInput.value = _urlInviteCode.toUpperCase()
   nameInput.focus()
   signupBtn.textContent = 'Registrieren'
   backToLoginBtn.style.display = ''
@@ -147,12 +154,43 @@ function enterSignupMode () {
 function exitSignupMode () {
   _signupMode = false
   nameGroup.classList.add('hidden')
+  inviteGroup.classList.add('hidden')
   consentGroup.classList.add('hidden')
   consentCheckbox.checked = false
   nameInput.value = ''
+  inviteCodeInput.value = ''
   signupBtn.textContent = 'Neues Konto erstellen'
   backToLoginBtn.style.display = 'none'
   setLoginStatus('')
+}
+
+async function claimInviteCode (userId, code) {
+  if (!code) return
+  const upper = code.toUpperCase().trim()
+
+  const { data: invite, error: fetchErr } = await sb
+    .from('invite_codes')
+    .select('id, role, patient_id')
+    .eq('code', upper)
+    .is('used_by', null)
+    .gt('expires_at', new Date().toISOString())
+    .maybeSingle()
+
+  if (fetchErr || !invite) return  // invalid/expired — silently skip, user gets default role
+
+  // Mark as used
+  await sb.from('invite_codes').update({ used_by: userId }).eq('id', invite.id)
+
+  // Set role on profile
+  await sb.from('profiles').update({ role: invite.role }).eq('id', userId)
+
+  // Create assignment if patient linked
+  if (invite.patient_id) {
+    await sb.from('caregiver_assignments').insert({
+      caregiver_id: userId,
+      user_id:      invite.patient_id,
+    }).throwOnError().catch(() => {})  // ignore duplicate
+  }
 }
 
 function isNetworkError (err) {
@@ -332,6 +370,11 @@ async function initApp (user) {
   if (appInitialized) return
   appInitialized = true
   currentUser = user
+
+  // Claim invite code before profile is read (sets role + assignment)
+  const pendingCode = inviteCodeInput?.value.trim() || _urlInviteCode
+  if (pendingCode) await claimInviteCode(user.id, pendingCode)
+
   exitSignupMode()
 
   const { displayName, role } = await ensureProfile(user)
@@ -390,6 +433,11 @@ async function ensureProfile (user) {
     displayName: existing.display_name || metaName,
     role:        existing.role ?? 'user',
   }
+}
+
+// If opened via invite link and not logged in → go straight to signup mode
+if (_urlInviteCode && !localStorage.getItem('menssana-dashboard-auth')) {
+  setTimeout(() => { if (!appInitialized) enterSignupMode() }, 300)
 }
 
 sb.auth.onAuthStateChange((event, session) => {

@@ -434,6 +434,71 @@ async function showUserList () {
   })
 }
 
+// ── Invite ────────────────────────────────────────────────
+const inviteOverlay        = document.getElementById('dash-invite-overlay')
+const invitePatientLabel   = document.getElementById('dash-invite-patient-name')
+const inviteRoleSelect     = document.getElementById('dash-invite-role')
+const inviteResult         = document.getElementById('dash-invite-result')
+const inviteLinkEl         = document.getElementById('dash-invite-link')
+const inviteGenerateBtn    = document.getElementById('dash-invite-generate')
+const inviteCopyBtn        = document.getElementById('dash-invite-copy')
+const inviteCopyHint       = document.getElementById('dash-invite-copy-hint')
+const inviteCloseBtn       = document.getElementById('dash-invite-close')
+const detailInviteBtn      = document.getElementById('detail-invite-btn')
+
+function generateCode () {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const arr   = new Uint8Array(8)
+  crypto.getRandomValues(arr)
+  return Array.from(arr, b => chars[b % chars.length]).join('')
+}
+
+detailInviteBtn?.addEventListener('click', () => {
+  invitePatientLabel.textContent = `Für: ${detailName.textContent}`
+  inviteRoleSelect.value  = 'caregiver'
+  inviteResult.classList.add('hidden')
+  inviteCopyHint.textContent = ''
+  inviteOverlay.classList.remove('hidden')
+})
+
+inviteGenerateBtn?.addEventListener('click', async () => {
+  if (!_detailUserId || !_caregiverId) return
+  const code = generateCode()
+  const role = inviteRoleSelect.value
+
+  const { error } = await sb.from('invite_codes').insert({
+    code,
+    role,
+    patient_id: _detailUserId,
+    created_by: _caregiverId,
+  })
+
+  if (error) {
+    inviteCopyHint.textContent = 'Fehler: ' + error.message
+    return
+  }
+
+  const base = 'https://jessrobgit.github.io/MensSana/'
+  inviteLinkEl.textContent = `${base}?invite=${code}`
+  inviteResult.classList.remove('hidden')
+  inviteCopyHint.textContent = ''
+})
+
+inviteCopyBtn?.addEventListener('click', async () => {
+  const link = inviteLinkEl.textContent
+  try {
+    await navigator.clipboard.writeText(link)
+    inviteCopyHint.textContent = '✓ Link kopiert!'
+  } catch {
+    inviteCopyHint.textContent = 'Bitte manuell kopieren.'
+  }
+})
+
+inviteCloseBtn?.addEventListener('click', () => inviteOverlay.classList.add('hidden'))
+inviteOverlay?.addEventListener('click', e => {
+  if (e.target === inviteOverlay) inviteOverlay.classList.add('hidden')
+})
+
 // ── Detail view ───────────────────────────────────────────
 detailBack.addEventListener('click', showUserList)
 

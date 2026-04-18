@@ -1845,3 +1845,6 @@ html, body {
   text-decoration: none;
 }
 .app-footer-legal a:hover { text-decoration: underline; }
+
+/* ── Invite code input ─────────────────────────────────── */
+#invite-code { font-family: monospace; letter-spacing: 0.15em; }

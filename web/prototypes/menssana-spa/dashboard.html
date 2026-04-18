@@ -62,6 +62,7 @@
         <div class="detail-header">
           <button class="btn-back" id="detail-back">← Übersicht</button>
           <h2 id="detail-name"></h2>
+          <button class="btn-outline detail-invite-btn" id="detail-invite-btn" title="Betreuungsperson einladen">+ Einladen</button>
         </div>
 
         <div class="detail-grid">
@@ -326,6 +327,33 @@
         <button class="btn btn-secondary" id="dash-photo-cancel">Abbrechen</button>
       </div>
       <p class="settings-status" id="dash-photo-status"></p>
+    </div>
+  </div>
+
+  <!-- Einladungs-Overlay -->
+  <div id="dash-invite-overlay" class="dash-form-overlay hidden" role="dialog" aria-modal="true">
+    <div class="dash-form-card">
+      <h3>Betreuungsperson einladen</h3>
+      <p id="dash-invite-patient-name" class="invite-patient-label"></p>
+      <div class="form-group">
+        <label for="dash-invite-role">Rolle</label>
+        <select id="dash-invite-role" class="form-select">
+          <option value="caregiver">Pflegeperson</option>
+          <option value="family">Familie</option>
+        </select>
+      </div>
+      <div id="dash-invite-result" class="hidden">
+        <p class="invite-result-label">Einladungslink (7 Tage gültig):</p>
+        <div class="invite-link-box">
+          <code id="dash-invite-link"></code>
+        </div>
+        <button class="btn btn-outline-small" id="dash-invite-copy">Kopieren</button>
+        <p class="invite-copy-hint" id="dash-invite-copy-hint"></p>
+      </div>
+      <div class="dash-form-actions">
+        <button class="btn btn-primary"   id="dash-invite-generate">Link generieren</button>
+        <button class="btn btn-secondary" id="dash-invite-close">Schließen</button>
+      </div>
     </div>
   </div>
 
