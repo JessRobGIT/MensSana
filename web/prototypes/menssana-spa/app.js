@@ -184,12 +184,12 @@ async function claimInviteCode (userId, code) {
   // Set role on profile
   await sb.from('profiles').update({ role: invite.role }).eq('id', userId)
 
-  // Create assignment if patient linked
+  // Create assignment if patient linked (ignore duplicate conflict)
   if (invite.patient_id) {
     await sb.from('caregiver_assignments').insert({
       caregiver_id: userId,
       user_id:      invite.patient_id,
-    }).throwOnError().catch(() => {})  // ignore duplicate
+    })
   }
 }
 
@@ -373,7 +373,11 @@ async function initApp (user) {
 
   // Claim invite code before profile is read (sets role + assignment)
   const pendingCode = inviteCodeInput?.value.trim() || _urlInviteCode
-  if (pendingCode) await claimInviteCode(user.id, pendingCode)
+  // Clear input first so a crash below doesn't cause an infinite retry loop
+  if (inviteCodeInput) inviteCodeInput.value = ''
+  if (pendingCode) {
+    try { await claimInviteCode(user.id, pendingCode) } catch (_) { /* invalid code — continue */ }
+  }
 
   exitSignupMode()
 
