@@ -343,7 +343,7 @@ async function initApp (user) {
     return
   }
 
-  if (typeof Sentry !== 'undefined') Sentry.setUser({ id: user.id })
+  if (typeof Sentry?.setUser === 'function') Sentry.setUser({ id: user.id })
   showApp()
   showSection('chat')   // always start on chat, regardless of any previous state
   headerUser.textContent = displayName || user.email
@@ -536,7 +536,7 @@ logoutBtn.addEventListener('click', () => {
         showBanner('Abmelden fehlgeschlagen: ' + error.message, true)
         logoutBtn.disabled = false
       } else {
-        if (typeof Sentry !== 'undefined') Sentry.setUser(null)
+        if (typeof Sentry?.setUser === 'function') Sentry.setUser(null)
       }
     }
   )

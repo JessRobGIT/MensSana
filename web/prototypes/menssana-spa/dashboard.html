@@ -6,7 +6,6 @@
   <meta name="theme-color" content="#2d6a4f" />
   <title>MensSana – Dashboard</title>
   <link rel="stylesheet" href="dashboard.css" />
-  <script src="https://js.sentry-cdn.com/749a7af93e37fc4bbef66600be2a4dee.min.js" crossorigin="anonymous" defer></script>
 </head>
 <body>
 
@@ -331,6 +330,15 @@
   </div>
 
   <script src="supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@sentry/browser@8/build/bundle.min.js" crossorigin="anonymous"></script>
+  <script>
+    if (typeof Sentry !== 'undefined' && typeof Sentry.init === 'function') {
+      Sentry.init({
+        dsn: "https://749a7af93e37fc4bbef66600be2a4dee@o4511239626686464.ingest.de.sentry.io/4511239639400528",
+        environment: "production"
+      })
+    }
+  </script>
   <script src="dashboard.js"></script>
   <footer class="app-footer-legal">
     <a href="datenschutz.html" target="_blank">Impressum &amp; Datenschutz</a>

@@ -266,7 +266,7 @@ async function initDashboard (user, isRecovery = false) {
   }
 
   _dashCurrentUser._role = profile.role
-  if (typeof Sentry !== 'undefined') Sentry.setUser({ id: user.id, role: profile.role })
+  if (typeof Sentry?.setUser === 'function') Sentry.setUser({ id: user.id, role: profile.role })
   const ROLE_LABELS = { caregiver: 'Pflegeperson', family: 'Familie' }
   const name = profile.display_name || profile.full_name || user.email
   dashUser.textContent = name
