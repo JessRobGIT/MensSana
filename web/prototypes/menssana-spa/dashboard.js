@@ -1,5 +1,13 @@
 // MensSana — Caregiver Dashboard
 
+function sentryCapture (err, context) {
+  if (typeof Sentry === 'undefined') return
+  Sentry.withScope(scope => {
+    if (context) scope.setExtras(context)
+    Sentry.captureException(err instanceof Error ? err : new Error(String(err)))
+  })
+}
+
 const SUPABASE_URL      = 'https://sycfzysiwshdijeintyt.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN5Y2Z6eXNpd3NoZGlqZWludHl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2NDk2MzUsImV4cCI6MjA5MDIyNTYzNX0.jaZwlY7dmWIHUm57L6j_gWkK9IIGn27-k2mV_n1PoDc'
 
@@ -258,6 +266,7 @@ async function initDashboard (user, isRecovery = false) {
   }
 
   _dashCurrentUser._role = profile.role
+  if (typeof Sentry !== 'undefined') Sentry.setUser({ id: user.id, role: profile.role })
   const ROLE_LABELS = { caregiver: 'Pflegeperson', family: 'Familie' }
   const name = profile.display_name || profile.full_name || user.email
   dashUser.textContent = name

@@ -1,6 +1,14 @@
 // MensSana — SPA
 // Supabase Auth + chat persistence + Claude via Edge Function
 
+function sentryCapture (err, context) {
+  if (typeof Sentry === 'undefined') return
+  Sentry.withScope(scope => {
+    if (context) scope.setExtras(context)
+    Sentry.captureException(err instanceof Error ? err : new Error(String(err)))
+  })
+}
+
 const SUPABASE_URL      = 'https://sycfzysiwshdijeintyt.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN5Y2Z6eXNpd3NoZGlqZWludHl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2NDk2MzUsImV4cCI6MjA5MDIyNTYzNX0.jaZwlY7dmWIHUm57L6j_gWkK9IIGn27-k2mV_n1PoDc'
 
@@ -335,6 +343,7 @@ async function initApp (user) {
     return
   }
 
+  if (typeof Sentry !== 'undefined') Sentry.setUser({ id: user.id })
   showApp()
   showSection('chat')   // always start on chat, regardless of any previous state
   headerUser.textContent = displayName || user.email
@@ -526,6 +535,8 @@ logoutBtn.addEventListener('click', () => {
       if (error) {
         showBanner('Abmelden fehlgeschlagen: ' + error.message, true)
         logoutBtn.disabled = false
+      } else {
+        if (typeof Sentry !== 'undefined') Sentry.setUser(null)
       }
     }
   )
@@ -2153,6 +2164,7 @@ async function callChatAPI (convId) {
       const errText = fnRes.ok
         ? 'Entschuldigung, ich konnte gerade nicht antworten. Bitte versuchen Sie es noch einmal.'
         : `Fehler ${fnRes.status} — bitte erneut versuchen.`
+      if (!fnRes.ok) sentryCapture(new Error(`Edge Function HTTP ${fnRes.status}`), { body: rawBody.slice(0, 500) })
       if (currentConversation?.id === convId) appendErrorWithRetry(convId, errText)
     }
 
@@ -2165,6 +2177,7 @@ async function callChatAPI (convId) {
         ? 'Kein Internet — bitte versuchen Sie es erneut wenn Sie wieder online sind.'
         : 'Entschuldigung, es ist ein Fehler aufgetreten.'
       if (isNetworkError(err)) showOffline()
+      else sentryCapture(err, { context: 'sendMessage' })
       if (currentConversation?.id === convId) appendErrorWithRetry(convId, errText)
     }
   } finally {

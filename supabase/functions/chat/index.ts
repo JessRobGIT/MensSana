@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
 
     if (!response.ok) {
       const err = await response.text()
-      console.error('Anthropic API error:', err)
+      console.error(JSON.stringify({ event: 'anthropic_error', status: response.status, body: err.slice(0, 500) }))
       return new Response(
         JSON.stringify({ error: 'AI service error' }),
         { status: 502, headers: { ...CORS, 'Content-Type': 'application/json' } }
@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.error('Function error:', msg)
+    console.error(JSON.stringify({ event: 'function_error', message: msg }))
     return new Response(
       JSON.stringify({ error: 'Internal error', detail: msg }),
       { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } }
