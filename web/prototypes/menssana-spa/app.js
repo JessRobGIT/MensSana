@@ -141,10 +141,10 @@ const _urlInviteCode  = new URLSearchParams(window.location.search).get('invite'
 function enterSignupMode () {
   _signupMode = true
   nameGroup.classList.remove('hidden')
-  inviteGroup.classList.remove('hidden')
+  inviteGroup?.classList.remove('hidden')
   consentGroup.classList.remove('hidden')
   consentCheckbox.checked = false
-  if (_urlInviteCode) inviteCodeInput.value = _urlInviteCode.toUpperCase()
+  if (_urlInviteCode && inviteCodeInput) inviteCodeInput.value = _urlInviteCode.toUpperCase()
   nameInput.focus()
   signupBtn.textContent = 'Registrieren'
   backToLoginBtn.style.display = ''
@@ -154,11 +154,11 @@ function enterSignupMode () {
 function exitSignupMode () {
   _signupMode = false
   nameGroup.classList.add('hidden')
-  inviteGroup.classList.add('hidden')
+  inviteGroup?.classList.add('hidden')
   consentGroup.classList.add('hidden')
   consentCheckbox.checked = false
   nameInput.value = ''
-  inviteCodeInput.value = ''
+  if (inviteCodeInput) inviteCodeInput.value = ''
   signupBtn.textContent = 'Neues Konto erstellen'
   backToLoginBtn.style.display = 'none'
   setLoginStatus('')
