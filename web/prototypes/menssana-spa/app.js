@@ -2141,7 +2141,7 @@ async function renderMailList () {
     }
 
     const replyBtn = div.querySelector('.mail-reply-btn')
-    replyBtn?.addEventListener('click', () => openCompose(peerId, peerName))
+    replyBtn?.addEventListener('click', e => { e.stopPropagation(); openCompose(peerId, peerName) })
 
     mailList.appendChild(div)
   })
@@ -2160,28 +2160,38 @@ async function openCompose (preselectedId = null, preselectedName = null) {
   mailComposeTo.innerHTML = '<option value="">Lade Kontakte…</option>'
   mailCompose.classList.remove('hidden')
 
-  // Fetch contacts in both directions: caregivers-of-me AND users-I-care-for
+  // Build contact list from actual message history (anyone we've talked to)
+  const [{ data: received }, { data: sent }] = await Promise.all([
+    sb.from('internal_messages').select('from_id').eq('to_id', currentUser.id).limit(100),
+    sb.from('internal_messages').select('to_id').eq('from_id', currentUser.id).limit(100),
+  ])
+  const contactIds = [...new Set([
+    ...(received ?? []).map(m => m.from_id),
+    ...(sent     ?? []).map(m => m.to_id),
+  ])].filter(Boolean)
+
+  // Also add anyone from caregiver_assignments as fallback
   const [{ data: asCaregivee }, { data: asCaregiver }] = await Promise.all([
     sb.from('caregiver_assignments').select('caregiver_id').eq('user_id', currentUser.id),
     sb.from('caregiver_assignments').select('user_id').eq('caregiver_id', currentUser.id),
   ])
-  const ids = [
+  const assignmentIds = [
     ...(asCaregivee ?? []).map(r => r.caregiver_id),
     ...(asCaregiver  ?? []).map(r => r.user_id),
   ]
-  const uniqueIds = [...new Set(ids)].filter(Boolean)
+  const allIds = [...new Set([...contactIds, ...assignmentIds])].filter(Boolean)
 
-  if (!uniqueIds.length) {
+  if (!allIds.length) {
     mailComposeTo.innerHTML = '<option value="">Keine Kontakte verfügbar</option>'
     return
   }
 
-  const { data: profiles } = await sb.from('profiles').select('id, display_name, full_name').in('id', uniqueIds)
+  const { data: profiles } = await sb.from('profiles').select('id, display_name, full_name').in('id', allIds)
   mailComposeTo.innerHTML = ''
   profiles?.forEach(p => {
     const opt = document.createElement('option')
     opt.value = p.id
-    opt.textContent = p.display_name || p.full_name || p.id
+    opt.textContent = p.display_name || p.full_name || 'Betreuungsperson'
     if (p.id === preselectedId) opt.selected = true
     mailComposeTo.appendChild(opt)
   })
