@@ -2154,24 +2154,37 @@ function updateMailBadge () {
   if (badge) { badge.textContent = unreadCount > 0 ? unreadCount : ''; badge.classList.toggle('hidden', unreadCount === 0) }
 }
 
-function openCompose (preselectedId = null, preselectedName = null) {
-  // Populate recipient dropdown from loaded caregivers
-  mailComposeTo.innerHTML = ''
-  const contacts = _caregivers.length ? _caregivers : []
-  if (!contacts.length) {
-    mailComposeTo.innerHTML = '<option value="">Keine Kontakte verfügbar</option>'
-  } else {
-    contacts.forEach(c => {
-      const opt = document.createElement('option')
-      opt.value = c.id
-      opt.textContent = c.name
-      if (c.id === preselectedId) opt.selected = true
-      mailComposeTo.appendChild(opt)
-    })
-  }
+async function openCompose (preselectedId = null, preselectedName = null) {
   mailComposeTitle.textContent = preselectedName ? `Antwort an ${preselectedName}` : 'Neue Nachricht'
   mailComposeText.value = ''
+  mailComposeTo.innerHTML = '<option value="">Lade Kontakte…</option>'
   mailCompose.classList.remove('hidden')
+
+  // Fetch contacts in both directions: caregivers-of-me AND users-I-care-for
+  const [{ data: asCaregivee }, { data: asCaregiver }] = await Promise.all([
+    sb.from('caregiver_assignments').select('caregiver_id').eq('user_id', currentUser.id),
+    sb.from('caregiver_assignments').select('user_id').eq('caregiver_id', currentUser.id),
+  ])
+  const ids = [
+    ...(asCaregivee ?? []).map(r => r.caregiver_id),
+    ...(asCaregiver  ?? []).map(r => r.user_id),
+  ]
+  const uniqueIds = [...new Set(ids)].filter(Boolean)
+
+  if (!uniqueIds.length) {
+    mailComposeTo.innerHTML = '<option value="">Keine Kontakte verfügbar</option>'
+    return
+  }
+
+  const { data: profiles } = await sb.from('profiles').select('id, display_name, full_name').in('id', uniqueIds)
+  mailComposeTo.innerHTML = ''
+  profiles?.forEach(p => {
+    const opt = document.createElement('option')
+    opt.value = p.id
+    opt.textContent = p.display_name || p.full_name || p.id
+    if (p.id === preselectedId) opt.selected = true
+    mailComposeTo.appendChild(opt)
+  })
   mailComposeText.focus()
 }
 
