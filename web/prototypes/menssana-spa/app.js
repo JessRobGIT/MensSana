@@ -2069,6 +2069,9 @@ async function loadIncomingMessages () {
 
 // ── Mail section ──────────────────────────────────────────
 
+// Contacts cache: id → name, built during renderMailList
+let _mailContacts = {}
+
 async function showMailView () {
   showSection('mail')
   mailCompose.classList.add('hidden')
@@ -2079,7 +2082,6 @@ async function renderMailList () {
   if (!currentUser) return
   mailList.innerHTML = '<p style="padding:1rem;color:#888">Lade Nachrichten…</p>'
 
-  // Load received AND sent messages
   const [{ data: received }, { data: sent }] = await Promise.all([
     sb.from('internal_messages')
       .select('id, content, created_at, read_at, from_id, to_id')
@@ -2102,11 +2104,15 @@ async function renderMailList () {
     return
   }
 
-  // Resolve all names
+  // Try to resolve names via profiles; fall back to "Betreuungsperson"
   const peerIds = [...new Set(all.map(m => m.from_id === currentUser.id ? m.to_id : m.from_id))]
   const { data: profiles } = await sb.from('profiles').select('id, display_name, full_name').in('id', peerIds)
   const nameById = {}
   profiles?.forEach(p => { nameById[p.id] = p.display_name || p.full_name || 'Betreuungsperson' })
+
+  // Cache contacts for openCompose (avoids repeated DB calls + RLS issues)
+  _mailContacts = {}
+  peerIds.forEach(id => { _mailContacts[id] = nameById[id] ?? 'Betreuungsperson' })
 
   mailList.innerHTML = ''
   all.forEach(msg => {
@@ -2118,17 +2124,38 @@ async function renderMailList () {
     const div = document.createElement('div')
     div.className = 'mail-item' + (isSent ? ' mail-sent' : '') + (unread ? ' mail-unread' : '')
 
-    const ts = new Date(msg.created_at).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
-    div.innerHTML = `
-      <div class="mail-item-header">
-        <span class="mail-direction">${isSent ? '→' : '←'}</span>
-        <span class="mail-sender">${isSent ? 'An: ' + peerName : peerName}</span>
-        <span class="mail-ts">${ts}</span>
-        ${unread ? '<span class="mail-badge">Neu</span>' : ''}
-      </div>
-      <div class="mail-content">${msg.content}</div>
-      ${!isSent ? `<div class="mail-actions"><button class="mail-reply-btn btn-icon" data-peer-id="${peerId}" data-peer-name="${peerName}">↩ Antworten</button></div>` : ''}
+    const ts = new Date(msg.created_at).toLocaleString('de-DE', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    })
+
+    // Header
+    const header = document.createElement('div')
+    header.className = 'mail-item-header'
+    header.innerHTML = `
+      <span class="mail-direction">${isSent ? '→' : '←'}</span>
+      <span class="mail-sender">${isSent ? 'An: ' + peerName : peerName}</span>
+      <span class="mail-ts">${ts}</span>
+      ${unread ? '<span class="mail-badge">Neu</span>' : ''}
     `
+    div.appendChild(header)
+
+    // Content
+    const content = document.createElement('div')
+    content.className = 'mail-content'
+    content.textContent = msg.content
+    div.appendChild(content)
+
+    // Reply button (always shown for received messages)
+    if (!isSent) {
+      const actions = document.createElement('div')
+      actions.className = 'mail-actions'
+      const replyBtn = document.createElement('button')
+      replyBtn.className = 'btn-icon mail-reply-btn'
+      replyBtn.textContent = '↩ Antworten'
+      replyBtn.addEventListener('click', e => { e.stopPropagation(); openCompose(peerId, peerName) })
+      actions.appendChild(replyBtn)
+      div.appendChild(actions)
+    }
 
     if (unread) {
       div.addEventListener('click', async e => {
@@ -2139,9 +2166,6 @@ async function renderMailList () {
         updateMailBadge()
       })
     }
-
-    const replyBtn = div.querySelector('.mail-reply-btn')
-    replyBtn?.addEventListener('click', e => { e.stopPropagation(); openCompose(peerId, peerName) })
 
     mailList.appendChild(div)
   })
@@ -2154,47 +2178,31 @@ function updateMailBadge () {
   if (badge) { badge.textContent = unreadCount > 0 ? unreadCount : ''; badge.classList.toggle('hidden', unreadCount === 0) }
 }
 
-async function openCompose (preselectedId = null, preselectedName = null) {
+function openCompose (preselectedId = null, preselectedName = null) {
   mailComposeTitle.textContent = preselectedName ? `Antwort an ${preselectedName}` : 'Neue Nachricht'
   mailComposeText.value = ''
-  mailComposeTo.innerHTML = '<option value="">Lade Kontakte…</option>'
+  mailComposeTo.innerHTML = ''
   mailCompose.classList.remove('hidden')
 
-  // Build contact list from actual message history (anyone we've talked to)
-  const [{ data: received }, { data: sent }] = await Promise.all([
-    sb.from('internal_messages').select('from_id').eq('to_id', currentUser.id).limit(100),
-    sb.from('internal_messages').select('to_id').eq('from_id', currentUser.id).limit(100),
-  ])
-  const contactIds = [...new Set([
-    ...(received ?? []).map(m => m.from_id),
-    ...(sent     ?? []).map(m => m.to_id),
-  ])].filter(Boolean)
+  // Use contacts cached by renderMailList — no extra DB call needed
+  const contacts = Object.entries(_mailContacts)
 
-  // Also add anyone from caregiver_assignments as fallback
-  const [{ data: asCaregivee }, { data: asCaregiver }] = await Promise.all([
-    sb.from('caregiver_assignments').select('caregiver_id').eq('user_id', currentUser.id),
-    sb.from('caregiver_assignments').select('user_id').eq('caregiver_id', currentUser.id),
-  ])
-  const assignmentIds = [
-    ...(asCaregivee ?? []).map(r => r.caregiver_id),
-    ...(asCaregiver  ?? []).map(r => r.user_id),
-  ]
-  const allIds = [...new Set([...contactIds, ...assignmentIds])].filter(Boolean)
-
-  if (!allIds.length) {
-    mailComposeTo.innerHTML = '<option value="">Keine Kontakte verfügbar</option>'
-    return
+  // If reply: ensure the preselected contact is in the list even if cache is stale
+  if (preselectedId && !_mailContacts[preselectedId]) {
+    contacts.unshift([preselectedId, preselectedName ?? 'Betreuungsperson'])
   }
 
-  const { data: profiles } = await sb.from('profiles').select('id, display_name, full_name').in('id', allIds)
-  mailComposeTo.innerHTML = ''
-  profiles?.forEach(p => {
-    const opt = document.createElement('option')
-    opt.value = p.id
-    opt.textContent = p.display_name || p.full_name || 'Betreuungsperson'
-    if (p.id === preselectedId) opt.selected = true
-    mailComposeTo.appendChild(opt)
-  })
+  if (!contacts.length) {
+    mailComposeTo.innerHTML = '<option value="">Keine Kontakte — bitte Mail-Ansicht neu laden</option>'
+  } else {
+    contacts.forEach(([id, name]) => {
+      const opt = document.createElement('option')
+      opt.value = id
+      opt.textContent = name
+      if (id === preselectedId) opt.selected = true
+      mailComposeTo.appendChild(opt)
+    })
+  }
   mailComposeText.focus()
 }
 
