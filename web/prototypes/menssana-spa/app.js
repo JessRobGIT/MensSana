@@ -46,11 +46,18 @@ const headerUser      = document.getElementById('header-user')
 const historyPanel    = document.getElementById('history-panel')
 const historyToggle   = document.getElementById('history-toggle-btn')
 const convList        = document.getElementById('conversation-list')
-const mailBtn        = document.getElementById('mail-btn')
-const mailSection    = document.getElementById('mail-section')
-const mailBack       = document.getElementById('mail-back')
-const mailMarkAllBtn = document.getElementById('mail-mark-all-btn')
-const mailList       = document.getElementById('mail-list')
+const mailBtn           = document.getElementById('mail-btn')
+const mailSection       = document.getElementById('mail-section')
+const mailBack          = document.getElementById('mail-back')
+const mailMarkAllBtn    = document.getElementById('mail-mark-all-btn')
+const mailList          = document.getElementById('mail-list')
+const mailNewBtn        = document.getElementById('mail-new-btn')
+const mailCompose       = document.getElementById('mail-compose')
+const mailComposeTitle  = document.getElementById('mail-compose-title')
+const mailComposeTo     = document.getElementById('mail-compose-to')
+const mailComposeText   = document.getElementById('mail-compose-text')
+const mailComposeSend   = document.getElementById('mail-compose-send')
+const mailComposeCancel = document.getElementById('mail-compose-cancel')
 const medsBtn        = document.getElementById('meds-btn')
 const todoBtn        = document.getElementById('todo-btn')
 const todoSection    = document.getElementById('todo-section')
@@ -2064,6 +2071,7 @@ async function loadIncomingMessages () {
 
 async function showMailView () {
   showSection('mail')
+  mailCompose.classList.add('hidden')
   await renderMailList()
 }
 
@@ -2071,49 +2079,70 @@ async function renderMailList () {
   if (!currentUser) return
   mailList.innerHTML = '<p style="padding:1rem;color:#888">Lade Nachrichten…</p>'
 
-  const { data, error } = await sb
-    .from('internal_messages')
-    .select('id, content, created_at, read_at, from_id')
-    .eq('to_id', currentUser.id)
-    .order('created_at', { ascending: false })
-    .limit(50)
+  // Load received AND sent messages
+  const [{ data: received }, { data: sent }] = await Promise.all([
+    sb.from('internal_messages')
+      .select('id, content, created_at, read_at, from_id, to_id')
+      .eq('to_id', currentUser.id)
+      .order('created_at', { ascending: false })
+      .limit(50),
+    sb.from('internal_messages')
+      .select('id, content, created_at, read_at, from_id, to_id')
+      .eq('from_id', currentUser.id)
+      .order('created_at', { ascending: false })
+      .limit(50),
+  ])
 
-  if (error || !data?.length) {
+  const all = [...(received ?? []), ...(sent ?? [])]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+
+  if (!all.length) {
     mailList.innerHTML = '<p style="padding:1rem;color:#888">Keine Nachrichten.</p>'
+    updateMailBadge()
     return
   }
 
-  const senderIds = [...new Set(data.map(m => m.from_id))]
-  const { data: profiles } = await sb
-    .from('profiles')
-    .select('id, display_name, full_name')
-    .in('id', senderIds)
+  // Resolve all names
+  const peerIds = [...new Set(all.map(m => m.from_id === currentUser.id ? m.to_id : m.from_id))]
+  const { data: profiles } = await sb.from('profiles').select('id, display_name, full_name').in('id', peerIds)
   const nameById = {}
   profiles?.forEach(p => { nameById[p.id] = p.display_name || p.full_name || 'Betreuungsperson' })
 
   mailList.innerHTML = ''
-  data.forEach(msg => {
-    const unread = !msg.read_at
+  all.forEach(msg => {
+    const isSent   = msg.from_id === currentUser.id
+    const unread   = !isSent && !msg.read_at
+    const peerId   = isSent ? msg.to_id : msg.from_id
+    const peerName = nameById[peerId] ?? 'Betreuungsperson'
+
     const div = document.createElement('div')
-    div.className = 'mail-item' + (unread ? ' mail-unread' : '')
+    div.className = 'mail-item' + (isSent ? ' mail-sent' : '') + (unread ? ' mail-unread' : '')
 
     const ts = new Date(msg.created_at).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
     div.innerHTML = `
       <div class="mail-item-header">
-        <span class="mail-sender">${nameById[msg.from_id] ?? 'Betreuungsperson'}</span>
+        <span class="mail-direction">${isSent ? '→' : '←'}</span>
+        <span class="mail-sender">${isSent ? 'An: ' + peerName : peerName}</span>
         <span class="mail-ts">${ts}</span>
         ${unread ? '<span class="mail-badge">Neu</span>' : ''}
       </div>
       <div class="mail-content">${msg.content}</div>
+      ${!isSent ? `<div class="mail-actions"><button class="mail-reply-btn btn-icon" data-peer-id="${peerId}" data-peer-name="${peerName}">↩ Antworten</button></div>` : ''}
     `
+
     if (unread) {
-      div.addEventListener('click', async () => {
+      div.addEventListener('click', async e => {
+        if (e.target.closest('.mail-reply-btn')) return
         await sb.from('internal_messages').update({ read_at: new Date().toISOString() }).eq('id', msg.id)
         div.classList.remove('mail-unread')
         div.querySelector('.mail-badge')?.remove()
         updateMailBadge()
       })
     }
+
+    const replyBtn = div.querySelector('.mail-reply-btn')
+    replyBtn?.addEventListener('click', () => openCompose(peerId, peerName))
+
     mailList.appendChild(div)
   })
   updateMailBadge()
@@ -2125,11 +2154,47 @@ function updateMailBadge () {
   if (badge) { badge.textContent = unreadCount > 0 ? unreadCount : ''; badge.classList.toggle('hidden', unreadCount === 0) }
 }
 
+function openCompose (preselectedId = null, preselectedName = null) {
+  // Populate recipient dropdown from loaded caregivers
+  mailComposeTo.innerHTML = ''
+  const contacts = _caregivers.length ? _caregivers : []
+  if (!contacts.length) {
+    mailComposeTo.innerHTML = '<option value="">Keine Kontakte verfügbar</option>'
+  } else {
+    contacts.forEach(c => {
+      const opt = document.createElement('option')
+      opt.value = c.id
+      opt.textContent = c.name
+      if (c.id === preselectedId) opt.selected = true
+      mailComposeTo.appendChild(opt)
+    })
+  }
+  mailComposeTitle.textContent = preselectedName ? `Antwort an ${preselectedName}` : 'Neue Nachricht'
+  mailComposeText.value = ''
+  mailCompose.classList.remove('hidden')
+  mailComposeText.focus()
+}
+
 mailBtn.addEventListener('click', showMailView)
 mailBack.addEventListener('click', () => showSection('chat'))
+mailNewBtn.addEventListener('click', () => openCompose())
+mailComposeCancel.addEventListener('click', () => mailCompose.classList.add('hidden'))
+
 mailMarkAllBtn.addEventListener('click', async () => {
   if (!currentUser) return
   await sb.from('internal_messages').update({ read_at: new Date().toISOString() }).eq('to_id', currentUser.id).is('read_at', null)
+  await renderMailList()
+})
+
+mailComposeSend.addEventListener('click', async () => {
+  const toId   = mailComposeTo.value
+  const content = mailComposeText.value.trim()
+  if (!toId || !content) return
+  mailComposeSend.disabled = true
+  const { error } = await sb.from('internal_messages').insert({ from_id: currentUser.id, to_id: toId, content })
+  mailComposeSend.disabled = false
+  if (error) { showBanner('Senden fehlgeschlagen: ' + error.message, true); return }
+  mailCompose.classList.add('hidden')
   await renderMailList()
 })
 

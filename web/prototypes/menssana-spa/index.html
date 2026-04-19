@@ -141,9 +141,26 @@
           <div class="meds-toolbar">
             <button class="btn-icon" id="mail-back">← Chat</button>
             <h2>Nachrichten</h2>
+            <button class="btn-icon" id="mail-new-btn">+ Neue Nachricht</button>
             <button class="btn-icon" id="mail-mark-all-btn">Alle gelesen</button>
           </div>
           <div id="mail-list" class="mail-list"></div>
+
+          <!-- Compose drawer -->
+          <div id="mail-compose" class="mail-compose hidden">
+            <div class="mail-compose-header">
+              <span id="mail-compose-title">Neue Nachricht</span>
+              <button class="btn-icon" id="mail-compose-cancel">✕</button>
+            </div>
+            <div class="mail-compose-body">
+              <label class="mail-compose-label">An:
+                <select id="mail-compose-to" class="mail-compose-select"></select>
+              </label>
+              <textarea id="mail-compose-text" class="mail-compose-textarea"
+                placeholder="Nachricht schreiben…" rows="4"></textarea>
+              <button class="btn-primary" id="mail-compose-send">Senden</button>
+            </div>
+          </div>
         </div>
 
         <!-- ── TO-DO ──────────────────────────────────── -->

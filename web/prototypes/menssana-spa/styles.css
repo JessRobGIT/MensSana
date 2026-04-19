@@ -1898,3 +1898,44 @@ button#mail-btn .mail-badge {
   margin-left: 2px;
 }
 button#mail-btn .mail-badge.hidden { display: none; }
+
+/* ── Mail compose drawer ───────────────────────────────── */
+.mail-compose {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  border-top: 2px solid #2d6a4f;
+  padding: 1rem;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
+}
+.mail-compose-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  color: #2d6a4f;
+}
+.mail-compose-body { display: flex; flex-direction: column; gap: 0.6rem; }
+.mail-compose-label { font-size: 0.9rem; color: #555; display: flex; flex-direction: column; gap: 0.25rem; }
+.mail-compose-select {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+.mail-compose-textarea {
+  padding: 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+  resize: vertical;
+  font-family: inherit;
+}
+.mail-compose-textarea:focus { outline: none; border-color: #2d6a4f; }
+
+/* ── Mail item additions ───────────────────────────────── */
+.mail-item.mail-sent { background: #f9f9f9; border-left: 4px solid #aaa; }
+.mail-direction { font-size: 1rem; color: #888; }
+.mail-actions { margin-top: 0.5rem; }
+.mail-reply-btn { font-size: 0.82rem; padding: 0.2em 0.7em; }
