@@ -1848,3 +1848,53 @@ html, body {
 
 /* ── Invite code input ─────────────────────────────────── */
 #invite-code { font-family: monospace; letter-spacing: 0.15em; }
+
+/* ── Mail section ──────────────────────────────────────── */
+.mail-list { display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem; }
+
+.mail-item {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  cursor: default;
+}
+.mail-item.mail-unread {
+  border-left: 4px solid #2d6a4f;
+  cursor: pointer;
+  background: #f0f7f4;
+}
+.mail-item.mail-unread:hover { background: #e4f0eb; }
+
+.mail-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  flex-wrap: wrap;
+}
+.mail-sender { font-weight: 600; color: #1a1a1a; }
+.mail-ts { font-size: 0.78rem; color: #888; margin-left: auto; }
+.mail-badge {
+  background: #2d6a4f;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1em 0.5em;
+  border-radius: 999px;
+}
+.mail-content { color: #333; font-size: 0.95rem; line-height: 1.5; white-space: pre-wrap; }
+
+/* Badge on the Mail button in the header */
+button#mail-btn .mail-badge {
+  display: inline-block;
+  background: #e03030;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1em 0.45em;
+  border-radius: 999px;
+  vertical-align: super;
+  margin-left: 2px;
+}
+button#mail-btn .mail-badge.hidden { display: none; }

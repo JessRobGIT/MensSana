@@ -82,9 +82,10 @@
         <button class="btn-icon" id="new-conv-btn" title="Gespräch">
           +Gespräch
         </button>
-        <button class="btn-icon" id="todo-btn">Aufgaben</button>
         <button class="btn-icon" id="meds-btn">Medikamente</button>
         <button class="btn-icon" id="cal-btn">Kalender</button>
+        <button class="btn-icon" id="todo-btn">Aufgaben</button>
+        <button class="btn-icon" id="mail-btn">Mail <span id="mail-badge" class="mail-badge hidden"></span></button>
         <button class="btn-icon" id="photo-btn">Fotos</button>
         <button class="btn-icon" id="settings-btn" title="Einstellungen">⚙</button>
         <button class="btn-icon" id="logout-btn">
@@ -133,6 +134,16 @@
           </div>
           <div id="photo-album-grid" class="photo-album-grid"></div>
           <div id="photo-grid" class="photo-grid hidden"></div>
+        </div>
+
+        <!-- ── MAIL ──────────────────────────────────── -->
+        <div id="mail-section" class="hidden">
+          <div class="meds-toolbar">
+            <button class="btn-icon" id="mail-back">← Chat</button>
+            <h2>Nachrichten</h2>
+            <button class="btn-icon" id="mail-mark-all-btn">Alle gelesen</button>
+          </div>
+          <div id="mail-list" class="mail-list"></div>
         </div>
 
         <!-- ── TO-DO ──────────────────────────────────── -->

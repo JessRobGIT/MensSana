@@ -46,6 +46,11 @@ const headerUser      = document.getElementById('header-user')
 const historyPanel    = document.getElementById('history-panel')
 const historyToggle   = document.getElementById('history-toggle-btn')
 const convList        = document.getElementById('conversation-list')
+const mailBtn        = document.getElementById('mail-btn')
+const mailSection    = document.getElementById('mail-section')
+const mailBack       = document.getElementById('mail-back')
+const mailMarkAllBtn = document.getElementById('mail-mark-all-btn')
+const mailList       = document.getElementById('mail-list')
 const medsBtn        = document.getElementById('meds-btn')
 const todoBtn        = document.getElementById('todo-btn')
 const todoSection    = document.getElementById('todo-section')
@@ -811,6 +816,7 @@ function showSection (name) {
   medsSection.classList.toggle('hidden',     name !== 'meds')
   calSection.classList.toggle('hidden',      name !== 'calendar')
   photoSection.classList.toggle('hidden',    name !== 'photo')
+  mailSection.classList.toggle('hidden',     name !== 'mail')
 }
 
 function showChatView () { showSection('chat') }
@@ -2038,21 +2044,94 @@ async function loadIncomingMessages () {
   const names = [...new Set(data.map(m => nameById[m.from_id] ?? 'Betreuungsperson'))]
   const noun  = data.length === 1 ? 'neue Nachricht' : 'neue Nachrichten'
 
+  // Update badge on Mail button
+  const badge = document.getElementById('mail-badge')
+  if (badge) { badge.textContent = data.length; badge.classList.remove('hidden') }
+
   bar.innerHTML = ''
   const span = document.createElement('span')
   span.textContent = `📬 ${data.length} ${noun} von ${names.join(', ')}`
-  const btn = document.createElement('button')
-  btn.className   = 'todo-reminder-link'
-  btn.textContent = 'Gelesen'
-  btn.addEventListener('click', async () => {
-    const ids = data.map(m => m.id)
-    await sb.from('internal_messages').update({ read_at: new Date().toISOString() }).in('id', ids)
-    bar.classList.add('hidden')
-  })
+  const openBtn = document.createElement('button')
+  openBtn.className   = 'todo-reminder-link'
+  openBtn.textContent = 'Lesen →'
+  openBtn.addEventListener('click', () => { bar.classList.add('hidden'); showMailView() })
   bar.appendChild(span)
-  bar.appendChild(btn)
+  bar.appendChild(openBtn)
   bar.classList.remove('hidden')
 }
+
+// ── Mail section ──────────────────────────────────────────
+
+async function showMailView () {
+  showSection('mail')
+  await renderMailList()
+}
+
+async function renderMailList () {
+  if (!currentUser) return
+  mailList.innerHTML = '<p style="padding:1rem;color:#888">Lade Nachrichten…</p>'
+
+  const { data, error } = await sb
+    .from('internal_messages')
+    .select('id, content, created_at, read_at, from_id')
+    .eq('to_id', currentUser.id)
+    .order('created_at', { ascending: false })
+    .limit(50)
+
+  if (error || !data?.length) {
+    mailList.innerHTML = '<p style="padding:1rem;color:#888">Keine Nachrichten.</p>'
+    return
+  }
+
+  const senderIds = [...new Set(data.map(m => m.from_id))]
+  const { data: profiles } = await sb
+    .from('profiles')
+    .select('id, display_name, full_name')
+    .in('id', senderIds)
+  const nameById = {}
+  profiles?.forEach(p => { nameById[p.id] = p.display_name || p.full_name || 'Betreuungsperson' })
+
+  mailList.innerHTML = ''
+  data.forEach(msg => {
+    const unread = !msg.read_at
+    const div = document.createElement('div')
+    div.className = 'mail-item' + (unread ? ' mail-unread' : '')
+
+    const ts = new Date(msg.created_at).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+    div.innerHTML = `
+      <div class="mail-item-header">
+        <span class="mail-sender">${nameById[msg.from_id] ?? 'Betreuungsperson'}</span>
+        <span class="mail-ts">${ts}</span>
+        ${unread ? '<span class="mail-badge">Neu</span>' : ''}
+      </div>
+      <div class="mail-content">${msg.content}</div>
+    `
+    if (unread) {
+      div.addEventListener('click', async () => {
+        await sb.from('internal_messages').update({ read_at: new Date().toISOString() }).eq('id', msg.id)
+        div.classList.remove('mail-unread')
+        div.querySelector('.mail-badge')?.remove()
+        updateMailBadge()
+      })
+    }
+    mailList.appendChild(div)
+  })
+  updateMailBadge()
+}
+
+function updateMailBadge () {
+  const unreadCount = mailList.querySelectorAll('.mail-unread').length
+  const badge = document.getElementById('mail-badge')
+  if (badge) { badge.textContent = unreadCount > 0 ? unreadCount : ''; badge.classList.toggle('hidden', unreadCount === 0) }
+}
+
+mailBtn.addEventListener('click', showMailView)
+mailBack.addEventListener('click', () => showSection('chat'))
+mailMarkAllBtn.addEventListener('click', async () => {
+  if (!currentUser) return
+  await sb.from('internal_messages').update({ read_at: new Date().toISOString() }).eq('to_id', currentUser.id).is('read_at', null)
+  await renderMailList()
+})
 
 // ── T5: Reminder banner ────────────────────────────────────
 
