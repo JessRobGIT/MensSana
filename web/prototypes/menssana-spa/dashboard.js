@@ -1149,11 +1149,12 @@ dashMsgOverlay?.addEventListener('click', e => {
 dashMsgSave?.addEventListener('click', async () => {
   const content = dashMsgText.value.trim()
   if (!content) { dashMsgStatus.textContent = 'Bitte eine Nachricht eingeben.'; return }
-  if (!_detailUserId || !_caregiverId) return
+  const targetId = _dashMailCurrentUserId || _detailUserId
+  if (!targetId || !_caregiverId) return
   dashMsgSave.disabled = true
   const { error } = await sb.from('internal_messages').insert({
     from_id: _caregiverId,
-    to_id:   _detailUserId,
+    to_id:   targetId,
     content,
   })
   dashMsgSave.disabled = false
@@ -1161,8 +1162,219 @@ dashMsgSave?.addEventListener('click', async () => {
     dashMsgStatus.textContent = 'Fehler: ' + error.message
   } else {
     dashMsgOverlay.classList.add('hidden')
-    await loadAndRenderMessages(_detailUserId)
+    if (_dashMailCurrentUserId) {
+      await renderDashMailThread(_dashMailCurrentUserId, _dashMailCurrentUserName)
+    } else {
+      await loadAndRenderMessages(_detailUserId)
+    }
   }
+})
+
+// ── Nachrichten-Übersicht ─────────────────────────────────
+
+const dashMailNavBtn       = document.getElementById('dash-mail-nav-btn')
+const dashMailNavBadge     = document.getElementById('dash-mail-nav-badge')
+const dashMailSection      = document.getElementById('dash-mail-section')
+const dashMailBack         = document.getElementById('dash-mail-back')
+const dashMailContacts     = document.getElementById('dash-mail-contacts')
+const dashMailThreadView   = document.getElementById('dash-mail-thread-view')
+const dashMailThreadBack   = document.getElementById('dash-mail-thread-back')
+const dashMailThreadTitle  = document.getElementById('dash-mail-thread-title')
+const dashMailComposeBtn   = document.getElementById('dash-mail-compose-btn')
+const dashMailThreadList   = document.getElementById('dash-mail-thread-list')
+
+let _dashMailCurrentUserId   = null
+let _dashMailCurrentUserName = null
+
+async function showDashMailSection () {
+  usersSection.classList.add('hidden')
+  detailPanel.classList.add('hidden')
+  dashMailSection.classList.remove('hidden')
+  dashMailThreadView.classList.add('hidden')
+  dashMailContacts.classList.remove('hidden')
+  await renderDashMailContacts()
+}
+
+async function renderDashMailContacts () {
+  if (!_caregiverId) return
+  dashMailContacts.innerHTML = '<p style="padding:1rem;color:#888">Lade…</p>'
+
+  const { data: assignments } = await sb.from('caregiver_assignments').select('user_id')
+  if (!assignments?.length) {
+    dashMailContacts.innerHTML = '<p style="padding:1rem;color:#888">Keine betreuten Personen zugewiesen.</p>'
+    return
+  }
+
+  const userIds = assignments.map(a => a.user_id)
+  const userIdList = userIds.join(',')
+
+  const [{ data: profiles }, { data: messages }] = await Promise.all([
+    sb.from('profiles').select('id, display_name, full_name').in('id', userIds),
+    sb.from('internal_messages')
+      .select('id, from_id, to_id, content, created_at, read_at')
+      .or(`and(from_id.in.(${userIdList}),to_id.eq.${_caregiverId}),and(from_id.eq.${_caregiverId},to_id.in.(${userIdList}))`)
+      .order('created_at', { ascending: false })
+      .limit(200),
+  ])
+
+  const nameById = {}
+  profiles?.forEach(p => { nameById[p.id] = p.display_name || p.full_name || 'Betreute Person' })
+
+  const summaries = {}
+  userIds.forEach(id => { summaries[id] = { name: nameById[id] ?? 'Betreute Person', lastMsg: null, unread: 0 } })
+  messages?.forEach(m => {
+    const userId = m.from_id === _caregiverId ? m.to_id : m.from_id
+    if (!summaries[userId]) return
+    if (!summaries[userId].lastMsg) summaries[userId].lastMsg = m
+    if (m.to_id === _caregiverId && !m.read_at) summaries[userId].unread++
+  })
+
+  dashMailContacts.innerHTML = ''
+  let totalUnread = 0
+
+  Object.entries(summaries).forEach(([userId, info]) => {
+    totalUnread += info.unread
+    const item = document.createElement('div')
+    item.className = 'dash-mail-contact-item'
+
+    const left = document.createElement('div')
+    left.style.cssText = 'flex:1;min-width:0'
+
+    const nameRow = document.createElement('div')
+    nameRow.style.cssText = 'display:flex;align-items:center;gap:0.5rem;margin-bottom:0.2rem'
+
+    const name = document.createElement('span')
+    name.className = 'dash-mail-contact-name'
+    name.textContent = info.name
+    nameRow.appendChild(name)
+
+    if (info.unread) {
+      const badge = document.createElement('span')
+      badge.className = 'dash-mail-contact-badge'
+      badge.textContent = info.unread
+      nameRow.appendChild(badge)
+    }
+    left.appendChild(nameRow)
+
+    if (info.lastMsg) {
+      const preview = document.createElement('div')
+      preview.className = 'dash-mail-contact-preview'
+      preview.textContent = (info.lastMsg.from_id === _caregiverId ? 'Sie: ' : '') + info.lastMsg.content
+      left.appendChild(preview)
+    }
+
+    const arrow = document.createElement('span')
+    arrow.textContent = '›'
+    arrow.style.cssText = 'color:#aaa;font-size:1.5rem;flex-shrink:0'
+
+    item.appendChild(left)
+    item.appendChild(arrow)
+    item.addEventListener('click', () => renderDashMailThread(userId, info.name))
+    dashMailContacts.appendChild(item)
+  })
+
+  if (dashMailNavBadge) {
+    dashMailNavBadge.textContent = totalUnread || ''
+    dashMailNavBadge.classList.toggle('hidden', !totalUnread)
+  }
+}
+
+async function renderDashMailThread (userId, userName) {
+  _dashMailCurrentUserId   = userId
+  _dashMailCurrentUserName = userName
+  dashMailContacts.classList.add('hidden')
+  dashMailThreadView.classList.remove('hidden')
+  dashMailThreadTitle.textContent = userName
+  dashMailThreadList.innerHTML = '<p style="padding:1rem;color:#888">Lade…</p>'
+
+  const { data } = await sb
+    .from('internal_messages')
+    .select('id, from_id, to_id, content, read_at, created_at')
+    .or(`and(from_id.eq.${_caregiverId},to_id.eq.${userId}),and(from_id.eq.${userId},to_id.eq.${_caregiverId})`)
+    .order('created_at', { ascending: true })
+    .limit(50)
+
+  dashMailThreadList.innerHTML = ''
+
+  if (!data?.length) {
+    dashMailThreadList.innerHTML = '<p style="padding:1rem;color:#888">Noch keine Nachrichten.</p>'
+    return
+  }
+
+  data.forEach(m => {
+    const isOut = m.from_id === _caregiverId
+    const unread = !isOut && !m.read_at
+
+    const div = document.createElement('div')
+    div.className = 'dash-mail-item' + (isOut ? ' dash-mail-sent' : '') + (unread ? ' dash-mail-unread' : '')
+
+    const ts = new Date(m.created_at).toLocaleString('de-DE', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    })
+
+    const header = document.createElement('div')
+    header.className = 'dash-mail-item-header'
+    header.innerHTML = `
+      <span style="color:#888">${isOut ? '→' : '←'}</span>
+      <span class="dash-mail-item-sender">${isOut ? 'Sie' : escHtml(userName)}</span>
+      <span class="dash-mail-item-ts">${ts}</span>
+      ${unread ? '<span class="dash-mail-new-badge">Neu</span>' : ''}
+    `
+    div.appendChild(header)
+
+    const content = document.createElement('div')
+    content.className = 'dash-mail-item-content'
+    content.textContent = m.content
+    div.appendChild(content)
+
+    if (!isOut) {
+      const actions = document.createElement('div')
+      actions.style.marginTop = '0.5rem'
+      const btn = document.createElement('button')
+      btn.className = 'dash-mail-reply-btn'
+      btn.textContent = '↩ Antworten'
+      btn.addEventListener('click', () => {
+        dashMsgText.value = ''
+        dashMsgStatus.textContent = ''
+        dashMsgFormTitle.textContent = 'Antwort an ' + userName
+        dashMsgOverlay.classList.remove('hidden')
+      })
+      actions.appendChild(btn)
+      div.appendChild(actions)
+    }
+
+    dashMailThreadList.appendChild(div)
+  })
+
+  // Mark received messages as read
+  const unreadIds = data.filter(m => m.to_id === _caregiverId && !m.read_at).map(m => m.id)
+  if (unreadIds.length) {
+    await sb.from('internal_messages').update({ read_at: new Date().toISOString() }).in('id', unreadIds)
+  }
+}
+
+dashMailNavBtn?.addEventListener('click', showDashMailSection)
+
+dashMailBack?.addEventListener('click', () => {
+  _dashMailCurrentUserId = null
+  _dashMailCurrentUserName = null
+  dashMailSection.classList.add('hidden')
+  usersSection.classList.remove('hidden')
+})
+
+dashMailThreadBack?.addEventListener('click', () => {
+  _dashMailCurrentUserId = null
+  _dashMailCurrentUserName = null
+  dashMailThreadView.classList.add('hidden')
+  dashMailContacts.classList.remove('hidden')
+})
+
+dashMailComposeBtn?.addEventListener('click', () => {
+  if (!_dashMailCurrentUserId) return
+  dashMsgText.value = ''
+  dashMsgStatus.textContent = ''
+  dashMsgFormTitle.textContent = 'Nachricht an ' + (_dashMailCurrentUserName ?? '')
+  dashMsgOverlay.classList.remove('hidden')
 })
 
 // ── Photos ────────────────────────────────────────────────

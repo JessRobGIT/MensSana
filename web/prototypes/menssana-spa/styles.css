@@ -1937,6 +1937,27 @@ button#mail-btn .mail-badge.hidden { display: none; }
 /* ── Mail item additions ───────────────────────────────── */
 .mail-item.mail-sent { background: #f9f9f9; border-left: 4px solid #aaa; }
 .mail-direction { font-size: 1rem; color: #888; }
+.mail-contact-tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0 0.75rem;
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 0.75rem;
+}
+.mail-contact-tab {
+  padding: 0.3em 0.9em;
+  border-radius: 999px;
+  border: 1.5px solid #2d6a4f;
+  background: #fff;
+  color: #2d6a4f;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.mail-contact-tab.active,
+.mail-contact-tab:hover { background: #2d6a4f; color: #fff; }
+
 .mail-actions { margin-top: 0.5rem; }
 .mail-reply-btn {
   font-size: 0.82rem;

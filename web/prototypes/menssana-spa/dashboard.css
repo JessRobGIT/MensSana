@@ -737,6 +737,94 @@ body {
   text-align: right;
 }
 
+/* ── NACHRICHTEN-ÜBERSICHT (dashboard) ──────────────────── */
+
+.dash-mail-contacts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 0;
+}
+.dash-mail-contact-item {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: background 0.15s;
+}
+.dash-mail-contact-item:hover { background: #f5faf7; }
+.dash-mail-contact-name { font-weight: 600; color: #1a1a1a; }
+.dash-mail-contact-preview {
+  font-size: 0.85rem;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40ch;
+}
+.dash-mail-contact-badge {
+  background: #e74c3c;
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.dash-mail-nav-badge {
+  background: #e74c3c;
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: 0.78rem;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.dash-mail-thread-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 0;
+}
+.dash-mail-item {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+}
+.dash-mail-item.dash-mail-sent { background: #f9f9f9; border-left: 4px solid #aaa; }
+.dash-mail-item.dash-mail-unread { border-left: 4px solid var(--green); background: #f0f7f4; }
+.dash-mail-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  flex-wrap: wrap;
+}
+.dash-mail-item-sender { font-weight: 600; color: #1a1a1a; }
+.dash-mail-item-ts { font-size: 0.78rem; color: #888; margin-left: auto; }
+.dash-mail-item-content { font-size: 0.9rem; color: #333; line-height: 1.5; white-space: pre-wrap; }
+.dash-mail-new-badge {
+  background: #2d6a4f;
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.dash-mail-reply-btn {
+  font-size: 0.82rem;
+  padding: 0.25em 0.8em;
+  background: #2d6a4f;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
 /* ── PHOTOS (dashboard) ─────────────────────────────────── */
 
 .dash-photo-content {

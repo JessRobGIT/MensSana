@@ -2071,6 +2071,9 @@ async function loadIncomingMessages () {
 
 // Contacts cache: id → name, built during renderMailList
 let _mailContacts = {}
+// Threads: peerId → { name, messages[] }
+let _mailThreads  = {}
+let _activePeerId = null
 
 async function showMailView () {
   showSection('mail')
@@ -2086,40 +2089,73 @@ async function renderMailList () {
     sb.from('internal_messages')
       .select('id, content, created_at, read_at, from_id, to_id')
       .eq('to_id', currentUser.id)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
       .limit(50),
     sb.from('internal_messages')
       .select('id, content, created_at, read_at, from_id, to_id')
       .eq('from_id', currentUser.id)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
       .limit(50),
   ])
 
   const all = [...(received ?? []), ...(sent ?? [])]
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
 
   if (!all.length) {
     mailList.innerHTML = '<p style="padding:1rem;color:#888">Keine Nachrichten.</p>'
+    _mailThreads = {}
     updateMailBadge()
     return
   }
 
-  // Try to resolve names via profiles; fall back to "Betreuungsperson"
   const peerIds = [...new Set(all.map(m => m.from_id === currentUser.id ? m.to_id : m.from_id))]
   const { data: profiles } = await sb.from('profiles').select('id, display_name, full_name').in('id', peerIds)
   const nameById = {}
   profiles?.forEach(p => { nameById[p.id] = p.display_name || p.full_name || 'Betreuungsperson' })
 
-  // Cache contacts for openCompose (avoids repeated DB calls + RLS issues)
   _mailContacts = {}
   peerIds.forEach(id => { _mailContacts[id] = nameById[id] ?? 'Betreuungsperson' })
 
-  mailList.innerHTML = ''
+  // Build per-contact threads (messages already sorted ascending)
+  _mailThreads = {}
+  peerIds.forEach(id => { _mailThreads[id] = { name: nameById[id] ?? 'Betreuungsperson', messages: [] } })
   all.forEach(msg => {
+    const peerId = msg.from_id === currentUser.id ? msg.to_id : msg.from_id
+    _mailThreads[peerId].messages.push(msg)
+  })
+
+  if (!_activePeerId || !_mailThreads[_activePeerId]) _activePeerId = peerIds[0]
+  renderMailThread(_activePeerId)
+  updateMailBadge()
+}
+
+function renderMailThread (peerId) {
+  _activePeerId = peerId
+  const thread = _mailThreads[peerId]
+  if (!thread) return
+
+  mailList.innerHTML = ''
+
+  // Contact tabs — only when > 1 peer
+  const peerIds = Object.keys(_mailThreads)
+  if (peerIds.length > 1) {
+    const tabs = document.createElement('div')
+    tabs.className = 'mail-contact-tabs'
+    peerIds.forEach(id => {
+      const unread = _mailThreads[id].messages.filter(m => m.to_id === currentUser.id && !m.read_at).length
+      const btn = document.createElement('button')
+      btn.className = 'mail-contact-tab' + (id === peerId ? ' active' : '')
+      btn.textContent = _mailThreads[id].name + (unread ? ` (${unread})` : '')
+      btn.addEventListener('click', () => renderMailThread(id))
+      tabs.appendChild(btn)
+    })
+    mailList.appendChild(tabs)
+  }
+
+  thread.messages.forEach(msg => {
     const isSent   = msg.from_id === currentUser.id
     const unread   = !isSent && !msg.read_at
-    const peerId   = isSent ? msg.to_id : msg.from_id
-    const peerName = nameById[peerId] ?? 'Betreuungsperson'
+    const peerName = thread.name
 
     const div = document.createElement('div')
     div.className = 'mail-item' + (isSent ? ' mail-sent' : '') + (unread ? ' mail-unread' : '')
@@ -2128,7 +2164,6 @@ async function renderMailList () {
       day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
     })
 
-    // Header
     const header = document.createElement('div')
     header.className = 'mail-item-header'
     header.innerHTML = `
@@ -2139,18 +2174,16 @@ async function renderMailList () {
     `
     div.appendChild(header)
 
-    // Content
     const content = document.createElement('div')
     content.className = 'mail-content'
     content.textContent = msg.content
     div.appendChild(content)
 
-    // Reply button (always shown for received messages)
     if (!isSent) {
       const actions = document.createElement('div')
       actions.className = 'mail-actions'
       const replyBtn = document.createElement('button')
-      replyBtn.className = 'btn-icon mail-reply-btn'
+      replyBtn.className = 'mail-reply-btn'
       replyBtn.textContent = '↩ Antworten'
       replyBtn.addEventListener('click', e => { e.stopPropagation(); openCompose(peerId, peerName) })
       actions.appendChild(replyBtn)
@@ -2161,6 +2194,7 @@ async function renderMailList () {
       div.addEventListener('click', async e => {
         if (e.target.closest('.mail-reply-btn')) return
         await sb.from('internal_messages').update({ read_at: new Date().toISOString() }).eq('id', msg.id)
+        msg.read_at = new Date().toISOString()
         div.classList.remove('mail-unread')
         div.querySelector('.mail-badge')?.remove()
         updateMailBadge()
@@ -2169,13 +2203,15 @@ async function renderMailList () {
 
     mailList.appendChild(div)
   })
-  updateMailBadge()
 }
 
 function updateMailBadge () {
-  const unreadCount = mailList.querySelectorAll('.mail-unread').length
+  let count = 0
+  Object.values(_mailThreads).forEach(t => {
+    count += t.messages.filter(m => m.to_id === currentUser?.id && !m.read_at).length
+  })
   const badge = document.getElementById('mail-badge')
-  if (badge) { badge.textContent = unreadCount > 0 ? unreadCount : ''; badge.classList.toggle('hidden', unreadCount === 0) }
+  if (badge) { badge.textContent = count > 0 ? count : ''; badge.classList.toggle('hidden', count === 0) }
 }
 
 function openCompose (preselectedId = null, preselectedName = null) {

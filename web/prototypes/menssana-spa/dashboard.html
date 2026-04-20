@@ -41,6 +41,7 @@
       <div class="dash-header-right">
         <span id="dash-user"></span>
         <span id="dash-role-badge" class="dash-role-badge hidden"></span>
+        <button class="btn-outline" id="dash-mail-nav-btn">Nachrichten <span id="dash-mail-nav-badge" class="dash-mail-nav-badge hidden"></span></button>
         <button class="btn-outline" id="dash-settings-btn" title="Einstellungen">⚙</button>
         <button class="btn-outline" id="logout-btn">Abmelden</button>
       </div>
@@ -55,6 +56,23 @@
         <p id="users-empty" class="empty-msg hidden">
           Keine betreuten Personen zugewiesen. Bitte in Supabase eine Zuweisung anlegen.
         </p>
+      </section>
+
+      <!-- Nachrichten overview -->
+      <section id="dash-mail-section" class="hidden">
+        <div class="detail-header">
+          <button class="btn-back" id="dash-mail-back">← Übersicht</button>
+          <h2>Nachrichten</h2>
+        </div>
+        <div id="dash-mail-contacts" class="dash-mail-contacts"></div>
+        <div id="dash-mail-thread-view" class="hidden">
+          <div class="detail-header" style="margin-top:1rem">
+            <button class="btn-back" id="dash-mail-thread-back">← Kontakte</button>
+            <h3 id="dash-mail-thread-title"></h3>
+            <button class="detail-add-btn" id="dash-mail-compose-btn">+ Neue Nachricht</button>
+          </div>
+          <div id="dash-mail-thread-list" class="dash-mail-thread-list"></div>
+        </div>
       </section>
 
       <!-- Detail panel -->
